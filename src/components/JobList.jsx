@@ -1,7 +1,7 @@
 import React from "react";
 
 function JobList({ jobs, selectedJobId, onSelect }) {
-  // 1) If no jobs yet, show a friendly message
+ 
   if (jobs.length === 0) {
     return (
       <p style={{ opacity: 0.8 }}>
@@ -10,7 +10,6 @@ function JobList({ jobs, selectedJobId, onSelect }) {
     );
   }
 
-  // 2) Render a simple table of jobs
   return (
     <table
       style={{
@@ -63,7 +62,6 @@ function JobList({ jobs, selectedJobId, onSelect }) {
   );
 }
 
-// Small inline styles
 const th = { padding: "12px 14px", fontWeight: 600, borderBottom: "1px solid #e5e7eb" };
 const td = { padding: "12px 14px", borderBottom: "1px solid #f1f5f9" };
 
