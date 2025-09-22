@@ -1,49 +1,94 @@
-
 import React from "react";
-import Header from "./components/Header";
-import JobList from "./components/JobList";
-
+import { useEffect, useState } from "react";
+import Header from "./components/Header.jsx";
+import JobForm from "./components/JobForm.jsx";
+import JobList from "./components/JobList.jsx";
+import Dashboard from "./components/Dashboard.jsx";
+import { JobAPI } from "./api.js";
 
 function App() {
- 
-  const [jobs, setJobs] = React.useState(() => {
-    const saved = localStorage.getItem("jobs");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingJob, setEditingJob] = useState(null);
 
-  const [selectedJobId, setSelectedJobId] = React.useState(null);
-  React.useEffect(() => {
-    localStorage.setItem("jobs", JSON.stringify(jobs));
-  }, [jobs]);
+ // useEffect Load jobs using async IIFE (Immediately Invoked Function Expression)
+ // it ended with [] to run only once
+  React.useEffect(() => { 
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await JobAPI.list();
+        setJobs(data);
+      } catch (e) {
+        setError(e.message || "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  const handleCreateJob = (job) => {
-    setJobs((prev) => [job, ...prev]);
+  const handleCreateJob = async (job) => {
+    try {
+      const created = await JobAPI.create(job);
+      setJobs((prev) => [created, ...prev]);
+    } catch (e) {
+      alert("Create failed: " + e.message);
+    }
   };
-  const handleDelete = () => {
-    if (!selectedJobId) return;
-    setJobs((prev) => prev.filter((j) => j.id !== selectedJobId));
-    setSelectedJobId(null);
+
+  const handleUpdateJob = async (id, partial) => {
+    try {
+      const updated = await JobAPI.update(id, partial);
+      setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...updated } : j)));
+    } catch (e) {
+      alert("Update failed: " + e.message);
+    }
   };
+
+  const handleDeleteJob = async (id) => {
+    try {
+      await JobAPI.remove(id);
+      setJobs((prev) => prev.filter((j) => j.id !== id));
+    } catch (e) {
+      alert("Delete failed: " + e.message);
+    }
+  };
+
+  if (loading) return <p style={{ padding: 16 }}>Loading…</p>;
+  if (error) return <p style={{ padding: 16, color: "crimson" }}>{error}</p>;
 
   return (
     <>
       <Header
         onCreate={handleCreateJob}
         onEdit={() => {
-          alert("Edit is coming next.");
+          if (!selectedJobId) return;
+          const job = jobs.find((j) => j.id === selectedJobId);
+          if (!job) return;
+          setEditingJob(job);
+          setIsEditing(true);
         }}
-        onDelete={handleDelete}
+        onCancelEdit={() => {
+          setIsEditing(false);
+          setEditingJob(null);
+        }}
+        onUpdate={async (id, partial) => {
+          await handleUpdateJob(id, partial);
+          setIsEditing(false);
+          setEditingJob(null);
+        }}
+        isEditing={isEditing}
+        editingJob={editingJob}
+        onDelete={() => selectedJobId && handleDeleteJob(selectedJobId)}
         canEdit={Boolean(selectedJobId)}
         canDelete={Boolean(selectedJobId)}
       />
 
-      <main style={{ padding: 16 }}>
-      <JobList
-        jobs={jobs}
-        selectedJobId={selectedJobId}
-        onSelect={setSelectedJobId}
-      />
-      </main>
+    <Dashboard jobs={jobs} />
+      <JobList jobs={jobs} selectedJobId={selectedJobId} onSelect={setSelectedJobId} />
     </>
   );
 }

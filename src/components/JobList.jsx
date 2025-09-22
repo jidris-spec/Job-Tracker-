@@ -31,11 +31,11 @@ function JobList({ jobs, selectedJobId, onSelect }) {
       </thead>
       <tbody>
         {jobs.map((job) => {
-          const selected = job.id === selectedJobId; // highlight selected row
+          const selected = job.id === selectedJobId;
           return (
             <tr
               key={job.id}
-              onClick={() => onSelect(job.id)} // mark as selected
+              onClick={() => onSelect(job.id)}
               style={{
                 cursor: "pointer",
                 background: selected ? "#e0f2f1" : "transparent",

@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Button,
   Dialog,
@@ -15,17 +15,18 @@ import {
 
 const STATUSES = ["Applied", "Interviewing", "Offer", "Rejected"];
 
-// Single validator/normalizer
 const validateAndNormalizeUrl = (value) => {
-  if (!value) return { error: "", url: "" };
+  if (!value) return { error: "Link is required", url: "" };
   try {
-    new URL(value);
-    return { error: "", url: value };
+    const u = new URL(value);
+    if (!u.hostname.includes(".")) throw new Error("Invalid host");
+    return { error: "", url: u.toString() };
   } catch {
     try {
       const fixed = `https://${value}`;
-      new URL(fixed);
-      return { error: "", url: fixed };
+      const u = new URL(fixed);
+      if (!u.hostname.includes(".")) throw new Error("Invalid host");
+      return { error: "", url: u.toString() };
     } catch {
       return {
         error: "Enter a valid URL (e.g. https://company.com/job)",
@@ -35,12 +36,21 @@ const validateAndNormalizeUrl = (value) => {
   }
 };
 
-function JobForm({ onCreate, open: externalOpen, setOpen: setExternalOpen, hideTrigger = false }) {
-  const [internalOpen, setInternalOpen] = React.useState(false);
+function JobForm({
+  onCreate,
+  onUpdate,
+  open: externalOpen,
+  setOpen: setExternalOpen,
+  hideTrigger = false,
+  jobToEdit,
+  onClose,
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  // ?? = nullish coalescing operator → use left side unless it’s null/undefined
   const open = externalOpen ?? internalOpen;
   const setOpen = setExternalOpen ?? setInternalOpen;
 
-  const [form, setForm] = React.useState({
+  const [form, setForm] = useState({
     company: "",
     title: "",
     status: "Applied",
@@ -48,7 +58,38 @@ function JobForm({ onCreate, open: externalOpen, setOpen: setExternalOpen, hideT
     link: "",
     notes: "",
   });
-  const [linkError, setLinkError] = React.useState("");
+  const [linkError, setLinkError] = useState("");
+
+  // Initialize or reset the form whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    if (jobToEdit) {
+      const { id, ...rest } = jobToEdit;
+      setForm({
+        company: rest.company || "",
+        title: rest.title || "",
+        status: rest.status || "Applied",
+        date: rest.date || new Date().toISOString().slice(0, 10),
+        link: rest.link || "",
+        notes: rest.notes || "",
+      });
+    } else {
+      setForm({
+        company: "",
+        title: "",
+        status: "Applied",
+        date: new Date().toISOString().slice(0, 10),
+        link: "",
+        notes: "",
+      });
+    }
+    setLinkError("");
+  }, [open, jobToEdit]);
+
+  const closeDialog = () => {
+    setOpen(false);
+    onClose?.();
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -63,11 +104,24 @@ function JobForm({ onCreate, open: externalOpen, setOpen: setExternalOpen, hideT
     setLinkError(error);
     if (error) return;
 
-    const job = { id: Date.now(), ...form, link: url };
-    onCreate?.(job);
-    setOpen(false);
+    if (jobToEdit) {
+      const partial = {
+        company: form.company,
+        title: form.title,
+        status: form.status,
+        date: form.date,
+        link: url,
+        notes: form.notes,
+      };
+      onUpdate?.(jobToEdit.id, partial);
+      closeDialog();
+      return;
+    }
 
-    // reset form
+    const job = { id: crypto.randomUUID(), ...form, link: url };
+    onCreate?.(job);
+    closeDialog();
+
     setForm({
       company: "",
       title: "",
@@ -87,8 +141,8 @@ function JobForm({ onCreate, open: externalOpen, setOpen: setExternalOpen, hideT
         </Button>
       )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Add New Job</DialogTitle>
+      <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
+        <DialogTitle>{jobToEdit ? "Edit Job" : "Add New Job"}</DialogTitle>
 
         <form id="job-form" onSubmit={handleSubmit}>
           <DialogContent>
@@ -150,7 +204,7 @@ function JobForm({ onCreate, open: externalOpen, setOpen: setExternalOpen, hideT
                   setLinkError(error);
                 }}
                 error={Boolean(linkError)}
-                helperText={linkError || "Optional but recommended"}
+                helperText={linkError || "Mandatory"}
                 inputProps={{ inputMode: "url" }}
                 fullWidth
               />
@@ -168,7 +222,7 @@ function JobForm({ onCreate, open: externalOpen, setOpen: setExternalOpen, hideT
           </DialogContent>
 
           <DialogActions>
-            <Button onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={closeDialog}>Cancel</Button>
             <Button type="submit" form="job-form" variant="contained">
               Save
             </Button>

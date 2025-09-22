@@ -24,6 +24,34 @@ header {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
+
+
+/* Header.css */
+
+:root {
+  --hdr-bg: #0f5c59;
+  --hdr-text: #ffffff;
+  --btn-bg: #ffffff;
+  --btn-text: #0f5c59;
+  --btn-hover-bg: #ffd700; /* gold */
+  --border-muted: rgba(255, 255, 255, 0.25);
+}
+
+/* Header container */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 30px;
+  background-color: var(--hdr-bg);
+  color: var(--hdr-text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
 /* Title (support both .title and .label) */
 .title,
 .label {
@@ -59,28 +87,19 @@ header {
   border-color: var(--btn-hover-bg);
 }
 
-/* ---------- Actions styling ---------- */
-
-/* Base look for any .action */
-.action {
+  .action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 14px;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   user-select: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-/* Remove default h3 spacing for pill items */
-.actions .action:not(button) {
-  margin: 0;
-}
-
-/* Primary button: ONLY applies to <button class="action"> (your + Add Job) */
 button.action {
   appearance: none;
   background-color: var(--btn-bg);
@@ -89,18 +108,18 @@ button.action {
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.12);
 }
-button.action:hover {
+button.action:hover:not(:disabled) {
   background-color: var(--btn-hover-bg);
   color: var(--btn-text);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.18);
 }
-button.action:active {
+button.action:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 1px 2px rgba(0,0,0,0.12);
 }
 button.action:focus-visible {
-  outline: 3px solid rgba(255, 215, 0, 0.6); /* gold focus ring */
+  outline: 3px solid rgba(255, 215, 0, 0.65); /* gold focus ring */
   outline-offset: 2px;
 }
 button.action:disabled {
@@ -108,8 +127,27 @@ button.action:disabled {
   cursor: not-allowed;
 }
 
-/* Ghost pills: non-button actions (<h3 class="action">) */
+button.action.action--ghost {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid var(--border-muted);
+  box-shadow: none;
+}
+button.action.action--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: translateY(-1px);
+}
+button.action.action--ghost:active:not(:disabled) {
+  transform: translateY(0);
+}
+button.action.action--ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .actions .action:not(button) {
+  margin: 0;
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   border: 1px solid var(--border-muted);
@@ -117,10 +155,37 @@ button.action:disabled {
   box-shadow: none;
 }
 .actions .action:not(button):hover {
-  /* keep calm on hover */
   transform: none;
   box-shadow: none;
 }
+
+.dashboard {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--panel, #fff);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.kpi-card {
+  padding: 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--card, #fafafa);
+}
+
+.kpi-label { font-size: 12px; opacity: 0.7; }
+.kpi-value { font-size: 20px; font-weight: 700; }
+
+.chart-title { margin: 8px 0 6px; font-weight: 600; }
+.chart { width: 100%; height: 280px; }
 
 
 @media (max-width: 760px) {
@@ -137,5 +202,13 @@ button.action:disabled {
     width: 100%;
     justify-content: flex-start;
     gap: 10px;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .action {
+    transition: none !important;
   }
 }
