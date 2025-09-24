@@ -6,6 +6,7 @@ import JobList from "./components/JobList.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import { JobAPI } from "./api.js";
 
+
 function App() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,7 @@ function App() {
   return (
     <>
       <Header
+        jobs={jobs}
         onCreate={handleCreateJob}
         onEdit={() => {
           if (!selectedJobId) return;

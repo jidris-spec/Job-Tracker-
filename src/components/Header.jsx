@@ -3,10 +3,14 @@ import "../styles/Header.css";
 import Logo from "../assets/logo.svg";
 import JobForm from "./JobForm";
 import { useState, useEffect } from "react";
+import exportJobsToCsv from "../utils/exportCsv";
+
+
 
 
 
 function Header({ 
+  jobs,
   onCreate, 
   onEdit, 
   onDelete, 
@@ -19,7 +23,7 @@ function Header({
   
 }) {
   const [open, setOpen] = React.useState(false);
-  const [theme, setTheme] = React.useState("light");
+  // const [theme, setTheme] = React.useState("light");
   
   React.useEffect(() => {
     if (isEditing) {
@@ -41,7 +45,7 @@ function Header({
   return (
     <header>
       <img src={Logo} alt="Job Tracker Logo" className="logo" />
-      <h3 className="label">Job Application Tracker</h3>
+      <h3 className="label">Job Applications Tracker</h3>
 
       <nav className="actions">
         <button 
@@ -74,8 +78,13 @@ function Header({
         </button>
 
         <button type="button" className="action action--ghost">Filter</button>
-        <button type="button" className="action action--ghost">Export</button>
-
+        <button
+          type="button"
+          className="action action--ghost"
+          onClick={() => exportJobsToCsv(editingJob ? [editingJob] : jobs)}
+        >
+          Export
+        </button>
        
       </nav>
 

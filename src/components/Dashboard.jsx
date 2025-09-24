@@ -8,7 +8,7 @@ import {
   Tooltip,
 } from "recharts";
 
-// simple palette (feel free to tweak)
+
 const COLORS = {
   Applied: "#4f46e5",
   Interviewing: "#f59e0b",
