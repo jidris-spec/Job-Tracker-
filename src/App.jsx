@@ -6,6 +6,7 @@ import JobList from "./components/JobList.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import { JobAPI } from "./api.js";
 
+
 function App() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
