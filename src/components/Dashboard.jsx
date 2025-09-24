@@ -1,3 +1,4 @@
+// src/components/Dashboard.jsx
 import React from "react";
 import "../styles/Dashboard.css";
 import getJobStats from "../utils/stats";
@@ -17,7 +18,16 @@ const COLORS = {
   Rejected: "#ef4444",
 };
 
-export default function Dashboard({ jobs }) {
+function KPI({ label, value }) {
+  return (
+    <div className="kpi">
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value}</div>
+    </div>
+  );
+}
+
+export default function Dashboard({ jobs = [] }) {
   const { totals, successRate } = getJobStats(jobs);
 
   const pieData = [
@@ -25,67 +35,61 @@ export default function Dashboard({ jobs }) {
     { name: "Interviewing", value: totals.Interviewing },
     { name: "Offer", value: totals.Offer },
     { name: "Rejected", value: totals.Rejected },
-  ].filter((d) => d.value > 0); // hide zero slices
+  ].filter((d) => d.value > 0);
+
+  const legendFormatter = (value, entry) => {
+    const count = entry && entry.payload ? entry.payload.value : 0;
+    const pct =
+      totals.total > 0 ? Math.round((count / totals.total) * 100) : 0;
+    return `${value} — ${count} (${pct}%)`;
+  };
 
   return (
     <section className="dashboard">
-      {/* Status distribution pie + right legend */}
+      {/* KPI cards */}
+      <div className="kpis">
+        <KPI label="Total" value={totals.total} />
+        <KPI label="Applied" value={totals.Applied} />
+        <KPI label="Interviewing" value={totals.Interviewing} />
+        <KPI label="Offers" value={totals.Offer} />
+        <KPI label="Rejected" value={totals.Rejected} />
+        <KPI label="Success Rate" value={`${successRate}%`} />
+      </div>
+
+      {/* Chart */}
       <div className="chart">
-        <h4 className="chart-title">Applications by Status</h4>
-        <ResponsiveContainer width="100%" height={300}>
-          <PieChart margin={{ right: 160 }}>
-            <Pie
-              data={pieData}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={55}
-              outerRadius={95}
-              paddingAngle={3}
-              cx="35%"  // move pie left to make room for legend
-              cy="50%"
-            >
-              {pieData.map((entry) => (
-                <Cell key={entry.name} fill={COLORS[entry.name]} />
-              ))}
-            </Pie>
-
-            <Tooltip
-              formatter={(val, name) => {
-                const pct =
-                  totals.total > 0
-                    ? Math.round((val / totals.total) * 100)
-                    : 0;
-                return [`${val} (${pct}%)`, name];
-              }}
-            />
-
-            <Legend
-              layout="vertical"
-              align="right"
-              verticalAlign="middle"
-              iconType="circle"
-              wrapperStyle={{ paddingLeft: 12 }}
-              formatter={(value, entry) => {
-                const count = entry?.payload?.value ?? 0;
-                const pct =
-                  totals.total > 0
-                    ? Math.round((count / totals.total) * 100)
-                    : 0;
-                return `${value} — ${count} (${pct}%)`;
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+        {pieData.length === 0 ? (
+          <p>No data yet. Add some jobs to see the chart.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={340}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="38%"           // move pie slightly left to make space for right legend
+                cy="50%"
+                outerRadius={110}
+                innerRadius={60}   // <-- makes it a doughnut
+                label={false}      // no numbers on slices
+                labelLine={false}
+              >
+                {pieData.map((entry) => (
+                  <Cell key={entry.name} fill={COLORS[entry.name]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend
+                layout="vertical"
+                align="right"
+                verticalAlign="middle"
+                formatter={legendFormatter}
+                wrapperStyle={{ paddingLeft: 12 }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </section>
-  );
-}
-
-function KPI({ label, value }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-value">{value}</div>
-    </div>
   );
 }

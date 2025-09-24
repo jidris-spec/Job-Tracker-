@@ -1,40 +1,41 @@
-.dashboard .kpis {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  
-  .kpi-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 12px;
-  }
-  
-  .kpi-label {
-    font-size: 12px;
-    opacity: 0.7;
-  }
-  
-  .kpi-value {
-    font-size: 20px;
-    font-weight: 700;
-    margin-top: 4px;
-  }
-  
-  .chart {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 16px;
-  }
-  
-  .chart-title {
-    margin: 0 0 8px;
-  }
-  
-  .recharts-default-legend {
-    max-width: 220px; /* keep legend tidy on narrow widths */
-  }
-  
+.dashboard {
+  display: grid;
+  gap: 16px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.kpi-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Chart container card look */
+.chart {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 300px;
+}
+
+/* Keep legend from wrapping too wide */
+.recharts-default-legend {
+  max-width: 260px;
+}
