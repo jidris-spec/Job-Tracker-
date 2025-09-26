@@ -4,6 +4,8 @@ import Logo from "../assets/logo.svg";
 import JobForm from "./JobForm";
 import { useState, useEffect } from "react";
 import exportJobsToCsv from "../utils/exportCsv";
+import DownloadIcon from "@mui/icons-material/Download";
+
 
 
 
@@ -77,13 +79,13 @@ function Header({
           Delete Job
         </button>
 
-        <button type="button" className="action action--ghost">Filter</button>
         <button
           type="button"
           className="action action--ghost"
           onClick={() => exportJobsToCsv(editingJob ? [editingJob] : jobs)}
-        >
-          Export
+          title="Export Jobs"
+          >
+          <DownloadIcon />
         </button>
        
       </nav>

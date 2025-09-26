@@ -1,0 +1,52 @@
+/* JobList.css */
+
+.no-jobs {
+    opacity: 0.8;
+  }
+  
+  .job-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .job-table thead tr {
+    background: #f3f4f6;
+    text-align: left;
+  }
+  
+  .job-table th {
+    padding: 12px 14px;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .job-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  
+  .job-row {
+    cursor: pointer;
+    background: transparent;
+  }
+  
+  .job-row.selected {
+    background: #e0f2f1;
+  }
+  
+  .job-link {
+    color: #2563eb;
+    text-decoration: none;
+  }
+  
+  .job-link:hover {
+    text-decoration: underline;
+  }
+  
+  .job-empty {
+    opacity: 0.6;
+  }
+  
