@@ -5,7 +5,8 @@ import JobForm from "./JobForm";
 import { useState, useEffect } from "react";
 import exportJobsToCsv from "../utils/exportCsv";
 import DownloadIcon from "@mui/icons-material/Download";
-
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 
 
 
@@ -22,6 +23,8 @@ function Header({
   isEditing,
   editingJob, 
   onUpdate,
+  themeMode = "light",
+  onToggleTheme = () => {},
   
 }) {
   const [open, setOpen] = React.useState(false);
@@ -87,7 +90,17 @@ function Header({
           >
           <DownloadIcon />
         </button>
-       
+
+        <button
+          type="button"
+          className="action action--ghost"
+          onClick={onToggleTheme}
+          title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label="Toggle theme"
+        >
+          {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+        </button>
+        
       </nav>
 
       <JobForm 

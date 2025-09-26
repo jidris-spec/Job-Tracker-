@@ -1,59 +1,29 @@
-/* Light theme (default) */
-:root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --text: #0f172a;
-  --muted: #475569;
-  --brand: #0f766e;
-  --brand-ghost: #0f766e1a; /* subtle tint */
-  --border: #e2e8f0;
-  --table-header: #eef2f6;
-  --link: #2563eb;
+/* --- Full height so background covers entire page --- */
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); }
+
+/* --- Light defaults --- */
+:root{
+  --bg:#f5f7fb;
+  --fg:#111827;
+  --card-bg:#ffffff;
+  --card-border:#e5e7eb;
+  --muted:#6b7280;
+  --header-bg:#f3f4f6;
 }
 
-
-/* Apply variables */
-html, body {
-  background: var(--bg);
-  color: var(--text);
+/* --- Dark theme --- */
+html[data-theme="dark"]{
+  --bg:#0b1220;          /* page background */
+  --fg:#e5e7eb;          /* base text */
+  --card-bg:#0f172a;     /* surfaces: cards, tables, chart boxes */
+  --card-border:#1f2937; /* borders in dark */
+  --muted:#9ca3af;
+  --header-bg:#111827;   /* table header row */
 }
 
-/* Example bindings you likely already have — just swap raw colors for vars */
-header {
-  background: var(--brand);
-  color: #fff;
-}
+/* App wrapper picks up full-page bg/text */
+.app{ min-height:100%; background:var(--bg); color:var(--fg); }
 
-.header .actions .action {
-  background: #fff;
-  color: var(--brand);
-  border: 1px solid transparent;
-}
-.header .actions .action.action--ghost {
-  background: transparent;
-  color: #fff;
-  border-color: #ffffff55;
-}
-
-
-
-table {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-thead th {
-  background: var(--table-header);
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-}
-
-tbody td {
-  border-top: 1px solid var(--border);
-}
-
-a {
-  color: var(--link);
-}
+/* Helpful defaults */
+a{ color:inherit; }

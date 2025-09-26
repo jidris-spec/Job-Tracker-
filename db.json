@@ -28,15 +28,6 @@
       "notes": "optimistic"
     },
     {
-      "id": "34c53e7c-b8fc-4e47-9af4-9cdff82891be",
-      "company": "pitech",
-      "title": "junior developer",
-      "status": "Offer",
-      "date": "2025-09-22",
-      "link": "https://clujbusiness.ro/profile/pitechplus/",
-      "notes": "Travelling to cluj very soon"
-    },
-    {
       "id": "125c27b8-db44-4118-a9fd-009f46b8c398",
       "company": "gaming spot",
       "title": "mid level developer",
@@ -44,6 +35,12 @@
       "date": "2025-09-22",
       "link": "https://stackoverflow.com/",
       "notes": "too demanding"
+    }
+  ],
+  "settings": [
+    {
+      "id": "1",
+      "theme": "dark"
     }
   ]
 }

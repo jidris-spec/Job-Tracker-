@@ -1,52 +1,12 @@
-/* JobList.css */
+.table-wrap{
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
 
-.no-jobs {
-    opacity: 0.8;
-  }
-  
-  .job-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  
-  .job-table thead tr {
-    background: #f3f4f6;
-    text-align: left;
-  }
-  
-  .job-table th {
-    padding: 12px 14px;
-    font-weight: 600;
-    border-bottom: 1px solid #e5e7eb;
-  }
-  
-  .job-table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid #f1f5f9;
-  }
-  
-  .job-row {
-    cursor: pointer;
-    background: transparent;
-  }
-  
-  .job-row.selected {
-    background: #e0f2f1;
-  }
-  
-  .job-link {
-    color: #2563eb;
-    text-decoration: none;
-  }
-  
-  .job-link:hover {
-    text-decoration: underline;
-  }
-  
-  .job-empty {
-    opacity: 0.6;
-  }
-  
+table{ width:100%; border-collapse:collapse; }
+thead tr{ background: var(--header-bg); }
+th, td{ padding:12px 14px; color: var(--fg); }
+tbody tr + tr{ border-top:1px solid var(--card-border); }
+tbody tr:hover{ background: color-mix(in srgb, var(--card-bg), #fff 3%); }

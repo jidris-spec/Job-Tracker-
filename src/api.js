@@ -30,3 +30,23 @@ export const JobAPI = {
     return true;
   },
 };
+
+export const ThemeAPI = {
+  async get() {
+    const r = await fetch(`${API_BASE}/settings/1`);
+    if (!r.ok) throw new Error(`Theme fetch failed (${r.status})`);
+    const data = await r.json();
+    // Map backend shape { id: 1, theme: "light" } -> { mode: "light" }
+    return { mode: data.theme || "light" };
+  },
+  async set(mode) {
+    const r = await fetch(`${API_BASE}/settings/1`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme: mode }),
+    });
+    if (!r.ok) throw new Error(`Theme update failed (${r.status})`);
+    const data = await r.json();
+    return { mode: data.theme };
+  },
+};
