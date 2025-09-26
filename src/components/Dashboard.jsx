@@ -29,16 +29,6 @@ export default function Dashboard({ jobs }) {
 
   return (
     <section className="dashboard">
-      {/* Top KPI cards */}
-      <div className="kpis">
-        <KPI label="Total" value={totals.total} />
-        <KPI label="Applied" value={totals.Applied} />
-        <KPI label="Interviewing" value={totals.Interviewing} />
-        <KPI label="Offers" value={totals.Offer} />
-        <KPI label="Rejected" value={totals.Rejected} />
-        <KPI label="Success Rate" value={`${successRate}%`} />
-      </div>
-
       {/* Status distribution pie + right legend */}
       <div className="chart">
         <h4 className="chart-title">Applications by Status</h4>
