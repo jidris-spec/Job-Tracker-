@@ -1,0 +1,3 @@
+[build]
+command = "npm --prefix my-app run build"
+publish = "my-app/dist"
