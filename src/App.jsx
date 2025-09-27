@@ -80,6 +80,20 @@ export default function App() {
     setEditingJob(null);
   };
 
+  const [query, setQuery] = useState("");
+const [statusFilter, setStatusFilter] = useState("All");
+const [sortBy, setSortBy] = useState("newest");
+
+const filtered = jobs
+  .filter(j =>
+    [j.company, j.title].some(v => v.toLowerCase().includes(query.toLowerCase()))
+  )
+  .filter(j => statusFilter === "All" ? true : j.status === statusFilter)
+  .sort((a,b) => sortBy === "newest"
+    ? new Date(b.date) - new Date(a.date)
+    : new Date(a.date) - new Date(b.date)
+  );
+
   // Toggle theme and persist to API (optimistic update)
   const toggleTheme = async () => {
     const next = mode === "light" ? "dark" : "light";
