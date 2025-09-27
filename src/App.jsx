@@ -15,7 +15,7 @@ export default function App() {
   const [editingJob, setEditingJob] = useState(null);
 
   // theme mode loaded from API
-  const [mode, setMode] = useState("light");
+  const [mode, setMode] = useState("dark");
   const [themeLoading, setThemeLoading] = useState(true);
 
   // Load theme preference from API
@@ -29,9 +29,8 @@ export default function App() {
           setMode(data.mode);
         }
       } catch (e) {
-        // fallback to system pref on failure
-        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setMode(prefersDark ? "dark" : "light");
+        // fallback to dark on failure
+        setMode("dark");
       } finally {
         if (!cancelled) setThemeLoading(false);
       }
