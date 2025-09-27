@@ -1,14 +1,12 @@
 import React from "react";
 import "../styles/Header.css";
-import Logo from "../assets/Logo.svg";
+import Logo from "../assets/logo.svg";
 import JobForm from "./JobForm";
 import { useState, useEffect } from "react";
 import exportJobsToCsv from "../utils/exportCsv";
 import DownloadIcon from "@mui/icons-material/Download";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
-
-
 
 
 
