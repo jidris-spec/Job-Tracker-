@@ -10,6 +10,9 @@ A simple, fast job application tracker. Add, edit, delete jobs; visualize your p
 - Dashboard charts (Recharts) to visualize your progress
 - Light/Dark theme (stored via API)
 - Zero-backend-ops: serverless functions under `my-app/api/`
+hosted on vercel
+
+https://job-tracker-2y7gpazeo-idris-projects-508cd8f1.vercel.app/
 
 ---
 
@@ -171,6 +174,7 @@ After deploy, verify in your browser DevTools → Network:
 - `npm run api` → Run JSON Server on port 3001 (optional, for Vite-proxy dev)
 
 ---
+
 
 ## License
 MIT
