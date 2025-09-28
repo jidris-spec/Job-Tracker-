@@ -1,5 +1,5 @@
 // api/settings/[id].js
-import { store } from "../../api/_lib/store.js";
+import { store } from "../_lib/store.js";
 
 async function readJson(req) {
   if (req.body && typeof req.body === "object") return req.body;
