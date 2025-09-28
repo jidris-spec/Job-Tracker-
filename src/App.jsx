@@ -110,6 +110,7 @@ const filtered = jobs
   return (
     <div className="app">
       <Header
+        jobs={jobs}
         onCreate={handleCreateJob}
         onEdit={() => {
           if (!selectedJobId) return;
