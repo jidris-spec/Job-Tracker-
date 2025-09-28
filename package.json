@@ -16,13 +16,14 @@
     "api": "json-server --watch db.json --port 3001"
   },
   "dependencies": {
-  "react": "18.3.1",
-  "react-dom": "18.3.1",
-  "@mui/material": "^7.3.2",
-  "@mui/icons-material": "^7.3.2",
-  "@emotion/react": "^11.14.0",
-  "@emotion/styled": "^11.14.1",
-  "recharts": "^3.2.1"
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@mui/material": "^7.3.2",
+    "@mui/icons-material": "^7.3.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "recharts": "^3.2.1",
+    "@vercel/kv": "^1.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

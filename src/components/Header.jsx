@@ -1,6 +1,6 @@
 import React from "react";
 import "../styles/Header.css";
-import Logo from "../assets/logo.svg";
+
 import JobForm from "./JobForm";
 import { useState, useEffect } from "react";
 import exportJobsToCsv from "../utils/exportCsv";
@@ -47,7 +47,7 @@ function Header({
 
   return (
     <header>
-      <img src={Logo} alt="Job Tracker Logo" className="logo" />
+      <img src="/logo.svg" alt="Job Tracker Logo" className="logo" />
       <h3 className="label">Job Applications Tracker</h3>
 
       <nav className="actions">
