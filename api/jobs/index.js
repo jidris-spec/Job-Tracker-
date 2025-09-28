@@ -1,5 +1,6 @@
 // api/jobs/index.js
-import { store } from "../../api/_lib/store.js";
+import { store } from "../_lib/store.js";
+import { randomUUID } from "node:crypto";
 
 async function readJson(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
       }
       // Ensure id exists (client generates UUID in JobForm)
       const job = {
-        id: payload.id || crypto.randomUUID?.() || String(Date.now()),
+        id: payload.id || randomUUID(),
         company: payload.company || "",
         title: payload.title || "",
         status: payload.status || "Applied",
