@@ -17,7 +17,11 @@ import {
   Select,
   InputLabel,
   FormControl,
+  IconButton,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 
 const STATUSES = [
   "Applied",
@@ -38,6 +42,9 @@ function JobForm({
   jobToEdit,
   onClose,
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   // Internal modal state
   const [internalOpen, setInternalOpen] =
     useState(false);
@@ -202,11 +209,15 @@ function JobForm({
         onClose={closeDialog}
         fullWidth
         maxWidth="sm"
+        fullScreen={isMobile}
       >
-        <DialogTitle>
-          {jobToEdit
-            ? "Edit Job"
-            : "Add New Job"}
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: isMobile ? 1 : 3 }}>
+          {jobToEdit ? "Edit Job" : "Add New Job"}
+          {isMobile && (
+            <IconButton onClick={closeDialog} size="small" aria-label="Close">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
         </DialogTitle>
 
         <form

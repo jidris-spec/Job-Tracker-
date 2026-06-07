@@ -1,6 +1,8 @@
 // src/App.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./styles/App.css";
+import { ThemeProvider, CssBaseline } from "@mui/material";
+import createAppTheme from "./theme.js";
 
 import Header from "./components/Header.jsx";
 import JobList from "./components/JobList.jsx";
@@ -8,6 +10,7 @@ import Dashboard from "./components/Dashboard.jsx";
 import Analytics from "./components/Analytics.jsx";
 import Settings from "./components/Settings.jsx";
 import Sidebar from "./components/Sidebar";
+import SearchIcon from "@mui/icons-material/Search";
 
 import { JobAPI } from "./api.js";
 
@@ -114,8 +117,11 @@ export default function App() {
     localStorage.setItem("theme", next);
   };
 
+  const muiTheme = useMemo(() => createAppTheme(mode), [mode]);
+
   return (
-    
+    <ThemeProvider theme={muiTheme}>
+      <CssBaseline />
   <div className="layout">
 <Sidebar
   activePage={activePage}
@@ -153,23 +159,18 @@ export default function App() {
         canDelete={Boolean(selectedJobId)}
         isEditing={isEditing}
         editingJob={editingJob}
+        activePage={activePage}
         themeMode={mode}
         onToggleTheme={toggleTheme}
       />
 
+      <div className="page">
       {loading && (
-        <p style={{ padding: 16 }}>Loading...</p>
+        <p className="state-msg">Loading your applications…</p>
       )}
 
       {error && (
-        <p
-          style={{
-            padding: 16,
-            color: "crimson",
-          }}
-        >
-          {error}
-        </p>
+        <p className="state-msg error">{error}</p>
       )}
 
       {!loading && !error && (
@@ -181,15 +182,18 @@ export default function App() {
           {activePage === "applications" && (
             <>
               <div className="filters">
-                <input
-                  className="search-input"
-                  type="search"
-                  placeholder="Search company or title..."
-                  value={query}
-                  onChange={(e) =>
-                    setQuery(e.target.value)
-                  }
-                />
+                <div className="search-wrap">
+                  <SearchIcon fontSize="small" />
+                  <input
+                    className="search-input"
+                    type="search"
+                    placeholder="Search company or title..."
+                    value={query}
+                    onChange={(e) =>
+                      setQuery(e.target.value)
+                    }
+                  />
+                </div>
 
                 <select
                   className="filter-select"
@@ -206,7 +210,7 @@ export default function App() {
                     "Rejected",
                   ].map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {s === "All" ? "All statuses" : s}
                     </option>
                   ))}
                 </select>
@@ -251,7 +255,9 @@ export default function App() {
           )}
         </>
       )}
+      </div>
     </div>
     </div>
+    </ThemeProvider>
   );
 }

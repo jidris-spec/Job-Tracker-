@@ -1,24 +1,30 @@
 // src/theme.js
 import { createTheme } from "@mui/material/styles";
 
-export default function createAppTheme(mode = "light") {
+export default function createAppTheme(mode = "dark") {
+  const isDark = mode === "dark";
   return createTheme({
     palette: {
       mode,
-      primary: { main: "#0f5c59" }, // teal
-      secondary: { main: "#0ea5e9" }, // cyan
+      primary: { main: isDark ? "#3b82f6" : "#2563eb" },
+      secondary: { main: "#22c55e" },
       error: { main: "#ef4444" },
       warning: { main: "#f59e0b" },
       success: { main: "#22c55e" },
       info: { main: "#3b82f6" },
       background: {
-        default: mode === "dark" ? "#0b1020" : "#f5f7fb",
-        paper: mode === "dark" ? "#111827" : "#ffffff",
+        default: isDark ? "#09090b" : "#f6f7f9",
+        paper: isDark ? "#111114" : "#ffffff",
       },
       text: {
-        primary: mode === "dark" ? "#e5e7eb" : "#111827",
-        secondary: mode === "dark" ? "#9ca3af" : "#374151",
+        primary: isDark ? "#fafafa" : "#0a0a0a",
+        secondary: isDark ? "#8b8b93" : "#5f6470",
       },
+      divider: isDark ? "#232329" : "#e6e8ec",
+    },
+    typography: {
+      fontFamily:
+        '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     },
     shape: {
       borderRadius: 12,
@@ -29,9 +35,9 @@ export default function createAppTheme(mode = "light") {
         styleOverrides: {
           root: {
             textTransform: "none",
-            borderRadius: 12,
+            borderRadius: 10,
             fontWeight: 600,
-            boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+            boxShadow: "none",
           },
         },
       },
@@ -39,7 +45,21 @@ export default function createAppTheme(mode = "light") {
         styleOverrides: { root: { borderRadius: 16 } },
       },
       MuiPaper: {
-        styleOverrides: { root: { borderRadius: 16 } },
+        styleOverrides: {
+          root: {
+            borderRadius: 16,
+            backgroundImage: "none",
+            border: `1px solid ${isDark ? "#232329" : "#e6e8ec"}`,
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paperFullScreen: {
+            borderRadius: 0,
+            border: "none",
+          },
+        },
       },
     },
   });

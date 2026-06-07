@@ -1,17 +1,25 @@
 import React from "react";
 import "../styles/JobList.css";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 function JobList({ jobs, selectedJobId, onSelect }) {
   if (jobs.length === 0) {
     return (
       <p className="no-jobs">
-        No jobs yet. Click <strong>+ Add Job</strong> to create your first entry.
+        No applications match your filters. Click <strong>Add Job</strong> to
+        create a new entry.
       </p>
     );
   }
 
   return (
     <div className="table-wrap">
+      <div className="table-meta">
+        <span className="count">
+          {jobs.length} application{jobs.length !== 1 ? "s" : ""}
+        </span>
+        <span className="hint">Select a row to edit or delete</span>
+      </div>
       <table>
         <thead>
           <tr>
@@ -29,13 +37,25 @@ function JobList({ jobs, selectedJobId, onSelect }) {
               <tr
                 key={job.id}
                 className={`job-row${selected ? " selected" : ""}`}
-                onClick={() => onSelect(job.id === selectedJobId ? null : job.id)}
+                onClick={() =>
+                  onSelect(job.id === selectedJobId ? null : job.id)
+                }
               >
-                <td data-label="Company">{job.company}</td>
-                <td data-label="Title">{job.title}</td>
-                <td data-label="Status">{job.status}</td>
-                <td data-label="Date">{job.date}</td>
-                <td data-label="Link">
+                <td className="company-cell" data-label="Company">
+                  {job.company}
+                </td>
+                <td className="title-cell" data-label="Title">
+                  {job.title}
+                </td>
+                <td className="status-cell" data-label="Status">
+                  <span className={`status-pill ${job.status}`}>
+                    {job.status}
+                  </span>
+                </td>
+                <td className="date-cell" data-label="Date">
+                  {job.date}
+                </td>
+                <td className="link-cell" data-label="Link">
                   {job.link ? (
                     <a
                       className="job-link"
@@ -44,10 +64,10 @@ function JobList({ jobs, selectedJobId, onSelect }) {
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      open
+                      Open <OpenInNewIcon sx={{ fontSize: 14 }} />
                     </a>
                   ) : (
-                    <span>—</span>
+                    <span style={{ color: "var(--faint)" }}>—</span>
                   )}
                 </td>
               </tr>

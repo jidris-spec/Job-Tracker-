@@ -1,29 +1,171 @@
-/* --- Full height so background covers entire page --- */
-html, body, #root { height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--fg); }
+/* ============================================================
+   JobTrack — Global Design Tokens
+   Premium dashboard theme (dark-first, light supported)
+   ============================================================ */
 
-/* --- Light defaults --- */
-:root{
-  --bg:#f5f7fb;
-  --fg:#111827;
-  --card-bg:#ffffff;
-  --card-border:#e5e7eb;
-  --muted:#6b7280;
-  --header-bg:#f3f4f6;
+html,
+body,
+#root {
+  height: 100%;
 }
 
-/* --- Dark theme --- */
-html[data-theme="dark"]{
-  --bg:#0b1220;          /* page background */
-  --fg:#e5e7eb;          /* base text */
-  --card-bg:#0f172a;     /* surfaces: cards, tables, chart boxes */
-  --card-border:#1f2937; /* borders in dark */
-  --muted:#9ca3af;
-  --header-bg:#111827;   /* table header row */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-/* App wrapper picks up full-page bg/text */
-.app{ min-height:100%; background:var(--bg); color:var(--fg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
 
-/* Helpful defaults */
-a{ color:inherit; }
+/* ---------- DARK (default) ---------- */
+:root,
+html[data-theme="dark"] {
+  --bg: #09090b;
+  --bg-elevated: #0c0c0f;
+  --fg: #fafafa;
+  --muted: #8b8b93;
+  --faint: #5c5c66;
+
+  --card-bg: #111114;
+  --card-bg-hover: #16161a;
+  --card-border: #232329;
+  --card-border-strong: #2e2e36;
+
+  --header-bg: #0e0e11;
+  --sidebar-bg: #0a0a0c;
+
+  --primary: #3b82f6;
+  --primary-strong: #2563eb;
+  --primary-soft: rgba(59, 130, 246, 0.14);
+  --on-primary: #ffffff;
+
+  --st-applied: #3b82f6;
+  --st-interviewing: #f59e0b;
+  --st-offer: #22c55e;
+  --st-rejected: #ef4444;
+
+  --st-applied-soft: rgba(59, 130, 246, 0.14);
+  --st-interviewing-soft: rgba(245, 158, 11, 0.14);
+  --st-offer-soft: rgba(34, 197, 94, 0.14);
+  --st-rejected-soft: rgba(239, 68, 68, 0.14);
+
+  --ring: rgba(59, 130, 246, 0.45);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+  --radius: 14px;
+}
+
+/* ---------- LIGHT ---------- */
+html[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-elevated: #ffffff;
+  --fg: #0a0a0a;
+  --muted: #5f6470;
+  --faint: #9aa0ab;
+
+  --card-bg: #ffffff;
+  --card-bg-hover: #fbfbfd;
+  --card-border: #e6e8ec;
+  --card-border-strong: #d6d9df;
+
+  --header-bg: #ffffff;
+  --sidebar-bg: #0a0a0c;
+
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: rgba(37, 99, 235, 0.1);
+  --on-primary: #ffffff;
+
+  --st-applied: #2563eb;
+  --st-interviewing: #d97706;
+  --st-offer: #16a34a;
+  --st-rejected: #dc2626;
+
+  --st-applied-soft: rgba(37, 99, 235, 0.1);
+  --st-interviewing-soft: rgba(217, 119, 6, 0.12);
+  --st-offer-soft: rgba(22, 163, 74, 0.12);
+  --st-rejected-soft: rgba(220, 38, 38, 0.1);
+
+  --ring: rgba(37, 99, 235, 0.35);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 24px 60px rgba(16, 24, 40, 0.12);
+
+  --radius: 14px;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--primary-soft);
+}
+
+/* Thin, themed scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--card-border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+
+/* Shared status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-pill.Applied {
+  color: var(--st-applied);
+  background: var(--st-applied-soft);
+}
+.status-pill.Interviewing {
+  color: var(--st-interviewing);
+  background: var(--st-interviewing-soft);
+}
+.status-pill.Offer {
+  color: var(--st-offer);
+  background: var(--st-offer-soft);
+}
+.status-pill.Rejected {
+  color: var(--st-rejected);
+  background: var(--st-rejected-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
