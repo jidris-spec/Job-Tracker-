@@ -2,48 +2,38 @@ import React from "react";
 import "../styles/Header.css";
 
 import JobForm from "./JobForm";
-import { useState, useEffect } from "react";
 import exportJobsToCsv from "../utils/exportCsv";
+import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 
-
-
-function Header({ 
+function Header({
   jobs,
-  onCreate, 
-  onEdit, 
-  onDelete, 
+  onCreate,
+  onEdit,
+  onDelete,
   onCancelEdit,
-  canEdit, 
-  canDelete, 
+  canEdit,
+  canDelete,
   isEditing,
-  editingJob, 
+  editingJob,
   onUpdate,
   themeMode = "light",
   onToggleTheme = () => {},
-  
 }) {
   const [open, setOpen] = React.useState(false);
-  // const [theme, setTheme] = React.useState("light");
-  
-  React.useEffect(() => {
-    if (isEditing) {
-      setOpen(true);
-    }
-  }, [isEditing]);
 
-  
+  React.useEffect(() => {
+    if (isEditing) setOpen(true);
+  }, [isEditing]);
 
   const handleClose = () => {
     setOpen(false);
-    if (isEditing) {
-      onCancelEdit();
-    }
+    if (isEditing) onCancelEdit();
   };
-
-  
 
   return (
     <header>
@@ -51,13 +41,14 @@ function Header({
       <h3 className="label">Job Applications Tracker</h3>
 
       <nav className="actions">
-        <button 
-          type="button" 
-          className="action" 
+        <button
+          type="button"
+          className="action"
           onClick={() => setOpen(true)}
           disabled={isEditing}
         >
-          {isEditing ? 'Editing...' : '+ Add Job'}
+          <AddIcon fontSize="small" />
+          <span className="btn-label">{isEditing ? "Editing…" : "Add Job"}</span>
         </button>
 
         <button
@@ -67,7 +58,8 @@ function Header({
           disabled={!canEdit || isEditing}
           title={!canEdit ? "Select a job first" : isEditing ? "Finish current edit first" : "Edit selected job"}
         >
-          Edit Job
+          <EditIcon fontSize="small" />
+          <span className="btn-label">Edit</span>
         </button>
 
         <button
@@ -77,36 +69,29 @@ function Header({
           disabled={!canDelete || isEditing}
           title={!canDelete ? "Select a job first" : isEditing ? "Finish current edit first" : "Delete selected job"}
         >
-          Delete Job
+          <DeleteIcon fontSize="small" />
+          <span className="btn-label">Delete</span>
         </button>
 
         <button
           type="button"
           className="action action--ghost"
-          onClick={() => exportJobsToCsv(editingJob ? [editingJob] : jobs)}
-          title="Export Jobs"
-          >
-          <DownloadIcon />
-        </button>
-
-        <button
-          type="button"
-          className="action action--ghost"
-          onClick={onToggleTheme}
-          title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          aria-label="Toggle theme"
+          onClick={() => exportJobsToCsv(jobs)}
+          title="Export to CSV"
         >
-          {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+          <DownloadIcon fontSize="small" />
+          <span className="btn-label">Export</span>
         </button>
+
         
       </nav>
 
-      <JobForm 
-        open={open} 
-        setOpen={setOpen} 
-        onCreate={onCreate} 
+      <JobForm
+        open={open}
+        setOpen={setOpen}
+        onCreate={onCreate}
         onUpdate={onUpdate}
-        hideTrigger 
+        hideTrigger
         jobToEdit={isEditing ? editingJob : null}
         onClose={handleClose}
       />

@@ -2,15 +2,23 @@
 // Storage helper for serverless functions on Vercel.
 // Uses Vercel KV if available, otherwise falls back to in-memory storage.
 
-import { kv as vercelKv } from "@vercel/kv";
+import { createClient } from "@vercel/kv";
 
-// In some environments, the import may be undefined. Guard it safely.
-const kv = vercelKv || null;
+// Only initialise KV when the required env vars are present.
+// Importing the `kv` singleton directly throws at module load time
+// when env vars are missing, which crashes every handler with a 500.
+const kvUrl = process.env.KV_REST_API_URL || process.env.KV_URL;
+const kvToken = process.env.KV_REST_API_TOKEN;
+const hasKV = Boolean(kvUrl && kvToken);
 
-// Detect whether KV is configured (env vars present)
-const hasKV = Boolean(
-  kv && (process.env.KV_REST_API_URL || process.env.KV_URL)
-);
+let kv = null;
+if (hasKV) {
+  try {
+    kv = createClient({ url: kvUrl, token: kvToken });
+  } catch {
+    // createClient failed — fall through to in-memory store
+  }
+}
 
 // In-memory fallback shared across warm invocations in same container
 const mem = (() => {

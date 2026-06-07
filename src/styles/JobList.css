@@ -1,12 +1,101 @@
-.table-wrap{
+.table-wrap {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 12px;
   overflow: hidden;
 }
 
-table{ width:100%; border-collapse:collapse; }
-thead tr{ background: var(--header-bg); }
-th, td{ padding:12px 14px; color: var(--fg); }
-tbody tr + tr{ border-top:1px solid var(--card-border); }
-tbody tr:hover{ background: color-mix(in srgb, var(--card-bg), #fff 3%); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead tr {
+  background: var(--header-bg);
+}
+th {
+  padding: 12px 14px;
+  color: var(--fg);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+td {
+  padding: 12px 14px;
+  color: var(--fg);
+}
+tbody tr + tr {
+  border-top: 1px solid var(--card-border);
+}
+tbody tr:hover {
+  background: color-mix(in srgb, var(--card-bg), #fff 3%);
+  cursor: pointer;
+}
+tbody tr.selected {
+  background: color-mix(in srgb, var(--card-bg), #4f46e5 10%);
+  outline: 2px solid #4f46e5;
+  outline-offset: -2px;
+}
+
+.job-link {
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 600;
+}
+.job-link:hover {
+  text-decoration: underline;
+}
+
+.no-jobs {
+  padding: 32px 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Mobile: card layout ── */
+@media (max-width: 640px) {
+  .table-wrap {
+    border-radius: 8px;
+  }
+
+  table,
+  tbody {
+    display: block;
+  }
+  thead {
+    display: none;
+  }
+
+  tbody tr {
+    display: block;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--card-border);
+    cursor: pointer;
+  }
+  tbody tr + tr {
+    border-top: none;
+  }
+  tbody tr.selected {
+    border-left: 3px solid #4f46e5;
+    outline: none;
+    background: color-mix(in srgb, var(--card-bg), #4f46e5 8%);
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 14px;
+    border: none;
+  }
+  td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}

@@ -1,54 +1,48 @@
 // src/App.jsx
 import React, { useEffect, useState } from "react";
+import "./styles/App.css";
+
 import Header from "./components/Header.jsx";
-import JobForm from "./components/JobForm.jsx";
 import JobList from "./components/JobList.jsx";
 import Dashboard from "./components/Dashboard.jsx";
-import { JobAPI, ThemeAPI } from "./api.js";
+import Analytics from "./components/Analytics.jsx";
+import Settings from "./components/Settings.jsx";
+import Sidebar from "./components/Sidebar";
+
+import { JobAPI } from "./api.js";
 
 export default function App() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activePage, setActivePage] = useState("dashboard");
+
   const [selectedJobId, setSelectedJobId] = useState(null);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
 
-  // theme mode loaded from API
-  const [mode, setMode] = useState("dark");
-  const [themeLoading, setThemeLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("newest");
 
-  // Load theme preference from API
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setThemeLoading(true);
-        const data = await ThemeAPI.get(); // expects { mode: "light" | "dark" }
-        if (!cancelled && (data?.mode === "light" || data?.mode === "dark")) {
-          setMode(data.mode);
-        }
-      } catch (e) {
-        // fallback to dark on failure
-        setMode("dark");
-      } finally {
-        if (!cancelled) setThemeLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const [mode, setMode] = useState(
+    () => localStorage.getItem("theme") ?? "dark"
+  );
 
-  // Reflect theme on <html>
+  // Theme
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", mode);
   }, [mode]);
 
-  // Load jobs once
+  // Load jobs
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
+
         const data = await JobAPI.list();
+
         setJobs(data);
       } catch (e) {
         setError(e.message || "Failed to load");
@@ -58,69 +52,100 @@ export default function App() {
     })();
   }, []);
 
-  // CRUD handlers
+  // CREATE
   const handleCreateJob = async (job) => {
     const created = await JobAPI.create(job);
+
     setJobs((prev) => [created, ...prev]);
   };
 
+  // UPDATE
   const handleUpdateJob = async (id, partial) => {
     const updated = await JobAPI.update(id, partial);
-    setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
+
+    setJobs((prev) =>
+      prev.map((j) => (j.id === id ? updated : j))
+    );
   };
 
+  // DELETE
   const handleDeleteJob = async (id) => {
     await JobAPI.remove(id);
-    setJobs((prev) => prev.filter((j) => j.id !== id));
-    if (selectedJobId === id) setSelectedJobId(null);
+
+    setJobs((prev) =>
+      prev.filter((j) => j.id !== id)
+    );
+
+    if (selectedJobId === id) {
+      setSelectedJobId(null);
+    }
   };
 
+  // CANCEL EDIT
   const onCancelEdit = () => {
     setIsEditing(false);
     setEditingJob(null);
   };
 
-  const [query, setQuery] = useState("");
-const [statusFilter, setStatusFilter] = useState("All");
-const [sortBy, setSortBy] = useState("newest");
+  // FILTERING
+  const filtered = jobs
+    .filter((j) =>
+      [j.company, j.title].some((v) =>
+        v.toLowerCase().includes(query.toLowerCase())
+      )
+    )
+    .filter((j) =>
+      statusFilter === "All"
+        ? true
+        : j.status === statusFilter
+    )
+    .sort((a, b) =>
+      sortBy === "newest"
+        ? new Date(b.date) - new Date(a.date)
+        : new Date(a.date) - new Date(b.date)
+    );
 
-const filtered = jobs
-  .filter(j =>
-    [j.company, j.title].some(v => v.toLowerCase().includes(query.toLowerCase()))
-  )
-  .filter(j => statusFilter === "All" ? true : j.status === statusFilter)
-  .sort((a,b) => sortBy === "newest"
-    ? new Date(b.date) - new Date(a.date)
-    : new Date(a.date) - new Date(b.date)
-  );
-
-  // Toggle theme and persist to API (optimistic update)
-  const toggleTheme = async () => {
+  // THEME TOGGLE
+  const toggleTheme = () => {
     const next = mode === "light" ? "dark" : "light";
+
     setMode(next);
-    try {
-      await ThemeAPI.set(next);
-    } catch (e) {
-      // revert on failure
-      setMode(mode);
-      alert("Failed to update theme: " + (e?.message || "unknown error"));
-    }
+
+    localStorage.setItem("theme", next);
   };
 
   return (
-    <div className="app">
+    
+  <div className="layout">
+<Sidebar
+  activePage={activePage}
+  setActivePage={setActivePage}
+/>
+    <div className="main-content">
       <Header
         jobs={jobs}
         onCreate={handleCreateJob}
+        onUpdate={async (id, partial) => {
+          await handleUpdateJob(id, partial);
+
+          onCancelEdit();
+        }}
         onEdit={() => {
           if (!selectedJobId) return;
-          const job = jobs.find((j) => j.id === selectedJobId);
+
+          const job = jobs.find(
+            (j) => j.id === selectedJobId
+          );
+
           if (!job) return;
+
           setEditingJob(job);
+
           setIsEditing(true);
         }}
         onDelete={() => {
           if (!selectedJobId) return;
+
           handleDeleteJob(selectedJobId);
         }}
         onCancelEdit={onCancelEdit}
@@ -128,39 +153,105 @@ const filtered = jobs
         canDelete={Boolean(selectedJobId)}
         isEditing={isEditing}
         editingJob={editingJob}
-        onUpdate={async (id, partial) => {
-          await handleUpdateJob(id, partial);
-          onCancelEdit();
-        }}
         themeMode={mode}
         onToggleTheme={toggleTheme}
       />
 
-      {(loading || themeLoading) && <p style={{ padding: 16 }}>Loading…</p>}
-      {error && <p style={{ padding: 16, color: "crimson" }}>{error}</p>}
+      {loading && (
+        <p style={{ padding: 16 }}>Loading...</p>
+      )}
 
-      {!loading && !themeLoading && !error && (
+      {error && (
+        <p
+          style={{
+            padding: 16,
+            color: "crimson",
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      {!loading && !error && (
         <>
-          <Dashboard jobs={jobs} />
+          {activePage === "dashboard" && (
+            <Dashboard jobs={jobs} />
+          )}
 
-          <main style={{ marginTop: 12 }}>
-            <JobList
+          {activePage === "applications" && (
+            <>
+              <div className="filters">
+                <input
+                  className="search-input"
+                  type="search"
+                  placeholder="Search company or title..."
+                  value={query}
+                  onChange={(e) =>
+                    setQuery(e.target.value)
+                  }
+                />
+
+                <select
+                  className="filter-select"
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value)
+                  }
+                >
+                  {[
+                    "All",
+                    "Applied",
+                    "Interviewing",
+                    "Offer",
+                    "Rejected",
+                  ].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="filter-select"
+                  value={sortBy}
+                  onChange={(e) =>
+                    setSortBy(e.target.value)
+                  }
+                >
+                  <option value="newest">
+                    Newest first
+                  </option>
+
+                  <option value="oldest">
+                    Oldest first
+                  </option>
+                </select>
+              </div>
+
+              <main>
+                <JobList
+                  jobs={filtered}
+                  selectedJobId={selectedJobId}
+                  onSelect={setSelectedJobId}
+                />
+              </main>
+            </>
+          )}
+
+          {activePage === "analytics" && (
+            <Analytics jobs={jobs} />
+          )}
+
+          {activePage === "settings" && (
+            <Settings
+              mode={mode}
+              onToggleTheme={toggleTheme}
               jobs={jobs}
-              selectedJobId={selectedJobId}
-              onSelect={setSelectedJobId}
             />
-          </main>
+          )}
         </>
       )}
-
-      {/* Optional: inline editor if you use it here; otherwise Header handles forms */}
-      {isEditing && editingJob && (
-        <JobForm
-          initial={editingJob}
-          onCancel={onCancelEdit}
-          onSubmit={(data) => handleUpdateJob(editingJob.id, data)}
-        />
-      )}
+    </div>
     </div>
   );
 }

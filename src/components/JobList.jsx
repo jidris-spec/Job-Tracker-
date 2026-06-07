@@ -11,48 +11,51 @@ function JobList({ jobs, selectedJobId, onSelect }) {
   }
 
   return (
-    <table className="job-table">
-      <thead>
-        <tr>
-          <th>Company</th>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Date</th>
-          <th>Link</th>
-        </tr>
-      </thead>
-      <tbody>
-        {jobs.map((job) => {
-          const selected = job.id === selectedJobId;
-          return (
-            <tr
-              key={job.id}
-              className={`job-row ${selected ? "selected" : ""}`}
-              onClick={() => onSelect(job.id)}
-            >
-              <td>{job.company}</td>
-              <td>{job.title}</td>
-              <td>{job.status}</td>
-              <td>{job.date}</td>
-              <td>
-                {job.link ? (
-                  <a
-                    className="job-link"
-                    href={job.link}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    open
-                  </a>
-                ) : (
-                  <span className="job-empty"></span>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => {
+            const selected = job.id === selectedJobId;
+            return (
+              <tr
+                key={job.id}
+                className={`job-row${selected ? " selected" : ""}`}
+                onClick={() => onSelect(job.id === selectedJobId ? null : job.id)}
+              >
+                <td data-label="Company">{job.company}</td>
+                <td data-label="Title">{job.title}</td>
+                <td data-label="Status">{job.status}</td>
+                <td data-label="Date">{job.date}</td>
+                <td data-label="Link">
+                  {job.link ? (
+                    <a
+                      className="job-link"
+                      href={job.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      open
+                    </a>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

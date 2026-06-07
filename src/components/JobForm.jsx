@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+} from "react";
+
 import { validateAndNormalizeUrl } from "../utils/validation";
+
 import {
   Button,
   Dialog,
@@ -14,43 +19,68 @@ import {
   FormControl,
 } from "@mui/material";
 
-const STATUSES = ["Applied", "Interviewing", "Offer", "Rejected"];
-
+const STATUSES = [
+  "Applied",
+  "Interviewing",
+  "Offer",
+  "Rejected",
+];
 
 function JobForm({
   onCreate,
   onUpdate,
+
   open: externalOpen,
   setOpen: setExternalOpen,
+
   hideTrigger = false,
+
   jobToEdit,
   onClose,
 }) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  // ?? = nullish coalescing operator → use left side unless it’s null/undefined
-  const open = externalOpen ?? internalOpen;
-  const setOpen = setExternalOpen ?? setInternalOpen;
+  // Internal modal state
+  const [internalOpen, setInternalOpen] =
+    useState(false);
 
+  // Use external state if provided
+  const open =
+    externalOpen ?? internalOpen;
+
+  const setOpen =
+    setExternalOpen ?? setInternalOpen;
+
+  // Form statejobform
   const [form, setForm] = useState({
     company: "",
     title: "",
     status: "Applied",
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date()
+      .toISOString()
+      .slice(0, 10),
     link: "",
     notes: "",
   });
-  const [linkError, setLinkError] = useState("");
 
-  // Initialize or reset the form whenever the dialog opens
+  const [linkError, setLinkError] =
+    useState("");
+
+  // Populate form when editing
   useEffect(() => {
     if (!open) return;
+
     if (jobToEdit) {
       const { id, ...rest } = jobToEdit;
+
       setForm({
         company: rest.company || "",
         title: rest.title || "",
-        status: rest.status || "Applied",
-        date: rest.date || new Date().toISOString().slice(0, 10),
+        status:
+          rest.status || "Applied",
+        date:
+          rest.date ||
+          new Date()
+            .toISOString()
+            .slice(0, 10),
         link: rest.link || "",
         notes: rest.notes || "",
       });
@@ -59,32 +89,55 @@ function JobForm({
         company: "",
         title: "",
         status: "Applied",
-        date: new Date().toISOString().slice(0, 10),
+        date: new Date()
+          .toISOString()
+          .slice(0, 10),
         link: "",
         notes: "",
       });
     }
+
     setLinkError("");
   }, [open, jobToEdit]);
 
+  // Close dialog
   const closeDialog = () => {
     setOpen(false);
+
     onClose?.();
   };
 
+  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
-    if (name === "link" && linkError) setLinkError("");
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (
+      name === "link" &&
+      linkError
+    ) {
+      setLinkError("");
+    }
   };
 
+  // Submit form
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const { error, url } = validateAndNormalizeUrl(form.link);
+    const { error, url } =
+      validateAndNormalizeUrl(
+        form.link
+      );
+
     setLinkError(error);
+
     if (error) return;
 
+    // EDIT MODE
     if (jobToEdit) {
       const partial = {
         company: form.company,
@@ -94,40 +147,77 @@ function JobForm({
         link: url,
         notes: form.notes,
       };
-      onUpdate?.(jobToEdit.id, partial);
+
+      onUpdate?.(
+        jobToEdit.id,
+        partial
+      );
+
       closeDialog();
+
       return;
     }
 
-    const job = { id: crypto.randomUUID(), ...form, link: url };
+    // CREATE MODE
+    const job = {
+      id: crypto.randomUUID(),
+      ...form,
+      link: url,
+    };
+
     onCreate?.(job);
+
     closeDialog();
 
+    // Reset form
     setForm({
       company: "",
       title: "",
       status: "Applied",
-      date: new Date().toISOString().slice(0, 10),
+      date: new Date()
+        .toISOString()
+        .slice(0, 10),
       link: "",
       notes: "",
     });
+
     setLinkError("");
   };
 
   return (
     <>
       {!hideTrigger && (
-        <Button variant="contained" onClick={() => setOpen(true)}>
+        <Button
+          variant="contained"
+          onClick={() =>
+            setOpen(true)
+          }
+        >
           + Add Job
         </Button>
       )}
 
-      <Dialog open={open} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>{jobToEdit ? "Edit Job" : "Add New Job"}</DialogTitle>
+      <Dialog
+        open={open}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {jobToEdit
+            ? "Edit Job"
+            : "Add New Job"}
+        </DialogTitle>
 
-        <form id="job-form" onSubmit={handleSubmit}>
+        <form
+          id="job-form"
+          onSubmit={handleSubmit}
+        >
           <DialogContent>
-            <Stack spacing={2} sx={{ mt: 1 }}>
+            <Stack
+              spacing={2}
+              sx={{ mt: 1 }}
+            >
               <TextField
                 name="company"
                 label="Company"
@@ -147,7 +237,10 @@ function JobForm({
               />
 
               <FormControl fullWidth>
-                <InputLabel id="status-label">Status</InputLabel>
+                <InputLabel id="status-label">
+                  Status
+                </InputLabel>
+
                 <Select
                   labelId="status-label"
                   label="Status"
@@ -156,7 +249,10 @@ function JobForm({
                   onChange={handleChange}
                 >
                   {STATUSES.map((s) => (
-                    <MenuItem key={s} value={s}>
+                    <MenuItem
+                      key={s}
+                      value={s}
+                    >
                       {s}
                     </MenuItem>
                   ))}
@@ -169,7 +265,9 @@ function JobForm({
                 type="date"
                 value={form.date}
                 onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
+                InputLabelProps={{
+                  shrink: true,
+                }}
                 fullWidth
                 required
               />
@@ -181,12 +279,23 @@ function JobForm({
                 value={form.link}
                 onChange={handleChange}
                 onBlur={(e) => {
-                  const { error } = validateAndNormalizeUrl(e.target.value);
+                  const { error } =
+                    validateAndNormalizeUrl(
+                      e.target.value
+                    );
+
                   setLinkError(error);
                 }}
-                error={Boolean(linkError)}
-                helperText={linkError || "Mandatory"}
-                inputProps={{ inputMode: "url" }}
+                error={Boolean(
+                  linkError
+                )}
+                helperText={
+                  linkError ||
+                  "Mandatory"
+                }
+                inputProps={{
+                  inputMode: "url",
+                }}
                 fullWidth
               />
 
@@ -203,8 +312,17 @@ function JobForm({
           </DialogContent>
 
           <DialogActions>
-            <Button onClick={closeDialog}>Cancel</Button>
-            <Button type="submit" form="job-form" variant="contained">
+            <Button
+              onClick={closeDialog}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              form="job-form"
+              variant="contained"
+            >
               Save
             </Button>
           </DialogActions>

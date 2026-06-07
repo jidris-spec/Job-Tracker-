@@ -61,17 +61,17 @@ export default function Dashboard({ jobs = [] }) {
         {pieData.length === 0 ? (
           <p>No data yet. Add some jobs to see the chart.</p>
         ) : (
-          <ResponsiveContainer width="100%" height={340}>
+          <ResponsiveContainer width="100%" height={360}>
             <PieChart>
               <Pie
                 data={pieData}
                 dataKey="value"
                 nameKey="name"
-                cx="38%"           // move pie slightly left to make space for right legend
-                cy="50%"
+                cx="50%"
+                cy="45%"
                 outerRadius={110}
-                innerRadius={60}   // <-- makes it a doughnut
-                label={false}      // no numbers on slices
+                innerRadius={60}
+                label={false}
                 labelLine={false}
               >
                 {pieData.map((entry) => (
@@ -80,11 +80,11 @@ export default function Dashboard({ jobs = [] }) {
               </Pie>
               <Tooltip />
               <Legend
-                layout="vertical"
-                align="right"
-                verticalAlign="middle"
+                layout="horizontal"
+                align="center"
+                verticalAlign="bottom"
                 formatter={legendFormatter}
-                wrapperStyle={{ paddingLeft: 12 }}
+                wrapperStyle={{ paddingTop: 12 }}
               />
             </PieChart>
           </ResponsiveContainer>
