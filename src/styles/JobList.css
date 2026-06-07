@@ -1,8 +1,29 @@
+/* ============================================================
+   Applications table
+   ============================================================ */
+
 .table-wrap {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
+}
+
+.table-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+.table-meta .count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.table-meta .hint {
+  font-size: 0.76rem;
+  color: var(--muted);
 }
 
 table {
@@ -13,50 +34,78 @@ thead tr {
   background: var(--header-bg);
 }
 th {
-  padding: 12px 14px;
-  color: var(--fg);
+  padding: 12px 18px;
+  color: var(--faint);
   text-align: left;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.06em;
 }
 td {
-  padding: 12px 14px;
+  padding: 14px 18px;
   color: var(--fg);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+td.company-cell {
+  font-weight: 600;
+}
+td.date-cell {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+tbody tr {
+  transition: background 0.12s ease;
 }
 tbody tr + tr {
   border-top: 1px solid var(--card-border);
 }
 tbody tr:hover {
-  background: color-mix(in srgb, var(--card-bg), #fff 3%);
+  background: var(--card-bg-hover);
   cursor: pointer;
 }
 tbody tr.selected {
-  background: color-mix(in srgb, var(--card-bg), #4f46e5 10%);
-  outline: 2px solid #4f46e5;
-  outline-offset: -2px;
+  background: var(--primary-soft);
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .job-link {
-  color: #4f46e5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.85rem;
 }
 .job-link:hover {
   text-decoration: underline;
 }
 
 .no-jobs {
-  padding: 32px 24px;
+  padding: 56px 24px;
   color: var(--muted);
   text-align: center;
+  background: var(--card-bg);
+  border: 1px dashed var(--card-border-strong);
+  border-radius: var(--radius);
+}
+.no-jobs strong {
+  color: var(--fg);
 }
 
 /* ── Mobile: card layout ── */
-@media (max-width: 640px) {
+@media (max-width: 680px) {
   .table-wrap {
-    border-radius: 8px;
+    border: none;
+    background: transparent;
+  }
+  .table-meta {
+    border: none;
+    padding: 0 2px 12px;
   }
 
   table,
@@ -68,34 +117,56 @@ tbody tr.selected {
   }
 
   tbody tr {
-    display: block;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--card-border);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    padding: 16px;
+    margin-bottom: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
     cursor: pointer;
   }
   tbody tr + tr {
-    border-top: none;
+    border-top: 1px solid var(--card-border);
   }
   tbody tr.selected {
-    border-left: 3px solid #4f46e5;
-    outline: none;
-    background: color-mix(in srgb, var(--card-bg), #4f46e5 8%);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
   }
 
   td {
-    display: grid;
-    grid-template-columns: 80px 1fr;
-    align-items: center;
-    padding: 4px 0;
-    font-size: 14px;
+    padding: 0;
     border: none;
+    display: flex;
+    align-items: center;
+  }
+  td.company-cell {
+    grid-column: 1;
+    font-size: 1rem;
+  }
+  td.title-cell {
+    grid-column: 1;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  td.status-cell {
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-end;
+  }
+  td.date-cell {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-end;
+  }
+  td.link-cell {
+    grid-column: 1 / -1;
+    padding-top: 6px;
+    border-top: 1px solid var(--card-border);
+    margin-top: 4px;
   }
   td::before {
-    content: attr(data-label);
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    content: none;
   }
 }

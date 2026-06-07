@@ -1,71 +1,86 @@
 import React from "react";
+import "../styles/Settings.css";
+import getJobStats from "../utils/stats";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import DownloadIcon from "@mui/icons-material/Download";
+import PaletteIcon from "@mui/icons-material/Palette";
+import StorageIcon from "@mui/icons-material/Storage";
+import InsightsIcon from "@mui/icons-material/Insights";
 import exportJobsToCsv from "../utils/exportCsv";
 
-const card = {
-  background: "var(--card-bg)",
-  border: "1px solid var(--card-border)",
-  borderRadius: 12,
-  padding: "16px 20px",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 16,
-};
-
-const btn = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "9px 16px",
-  borderRadius: 8,
-  border: "1px solid var(--card-border)",
-  background: "var(--card-bg)",
-  color: "var(--fg)",
-  fontSize: 14,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
 export default function Settings({ mode, onToggleTheme, jobs = [] }) {
-  return (
-    <section style={{ padding: "8px 0" }}>
-      <h2 style={{ color: "var(--fg)", marginBottom: 20, fontSize: 20, fontWeight: 700 }}>
-        Settings
-      </h2>
+  const { totals, successRate } = getJobStats(jobs);
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={card}>
+  return (
+    <section className="settings">
+      <div className="settings-summary">
+        <div className="settings-summary-icon" aria-hidden="true">
+          <InsightsIcon />
+        </div>
+        <div className="settings-summary-stats">
+          <div className="ss-item">
+            <span className="ss-value">{totals.total}</span>
+            <span className="ss-label">Applications</span>
+          </div>
+          <div className="ss-item">
+            <span className="ss-value">{totals.Interviewing}</span>
+            <span className="ss-label">Interviewing</span>
+          </div>
+          <div className="ss-item">
+            <span className="ss-value">{totals.Offer}</span>
+            <span className="ss-label">Offers</span>
+          </div>
+          <div className="ss-item">
+            <span className="ss-value">{successRate}%</span>
+            <span className="ss-label">Success rate</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card-left">
+          <span className="settings-card-icon" aria-hidden="true">
+            <PaletteIcon fontSize="small" />
+          </span>
           <div>
-            <div style={{ color: "var(--fg)", fontWeight: 600, marginBottom: 4 }}>Appearance</div>
-            <div style={{ color: "var(--muted)", fontSize: 13 }}>
+            <div className="settings-card-title">Appearance</div>
+            <div className="settings-card-desc">
               Currently using {mode === "dark" ? "dark" : "light"} mode
             </div>
           </div>
-          <button style={btn} onClick={onToggleTheme}>
-            {mode === "dark" ? (
-              <LightModeIcon fontSize="small" />
-            ) : (
-              <DarkModeIcon fontSize="small" />
-            )}
-            {mode === "dark" ? "Switch to Light" : "Switch to Dark"}
-          </button>
         </div>
+        <button className="settings-btn" onClick={onToggleTheme}>
+          {mode === "dark" ? (
+            <LightModeIcon fontSize="small" />
+          ) : (
+            <DarkModeIcon fontSize="small" />
+          )}
+          {mode === "dark" ? "Switch to Light" : "Switch to Dark"}
+        </button>
+      </div>
 
-        <div style={card}>
+      <div className="settings-card">
+        <div className="settings-card-left">
+          <span className="settings-card-icon" aria-hidden="true">
+            <StorageIcon fontSize="small" />
+          </span>
           <div>
-            <div style={{ color: "var(--fg)", fontWeight: 600, marginBottom: 4 }}>Export Data</div>
-            <div style={{ color: "var(--muted)", fontSize: 13 }}>
-              Download all {jobs.length} application{jobs.length !== 1 ? "s" : ""} as a CSV file
+            <div className="settings-card-title">Export Data</div>
+            <div className="settings-card-desc">
+              Download all {jobs.length} application
+              {jobs.length !== 1 ? "s" : ""} as a CSV file
             </div>
           </div>
-          <button style={btn} onClick={() => exportJobsToCsv(jobs)} disabled={jobs.length === 0}>
-            <DownloadIcon fontSize="small" />
-            Export CSV
-          </button>
         </div>
+        <button
+          className="settings-btn"
+          onClick={() => exportJobsToCsv(jobs)}
+          disabled={jobs.length === 0}
+        >
+          <DownloadIcon fontSize="small" />
+          Export CSV
+        </button>
       </div>
     </section>
   );

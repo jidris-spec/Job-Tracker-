@@ -1,0 +1,138 @@
+/* ============================================================
+   Settings page
+   ============================================================ */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Summary banner ── */
+.settings-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px;
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+.settings-summary-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.settings-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  flex: 1;
+}
+.ss-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ss-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+.ss-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+/* ── Setting rows ── */
+.settings-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.settings-card-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.settings-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--muted);
+  background: var(--card-bg-hover);
+  border: 1px solid var(--card-border);
+}
+.settings-card-title {
+  color: var(--fg);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.settings-card-desc {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-hover);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.settings-btn:hover:not(:disabled) {
+  background: var(--card-border);
+  border-color: var(--card-border-strong);
+}
+.settings-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.settings-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .settings-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .settings-summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .settings-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .settings-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

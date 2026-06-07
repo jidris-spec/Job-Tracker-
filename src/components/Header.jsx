@@ -10,6 +10,25 @@ import DownloadIcon from "@mui/icons-material/Download";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 
+const PAGE_META = {
+  dashboard: {
+    title: "Dashboard",
+    sub: "An overview of your job search at a glance",
+  },
+  applications: {
+    title: "Applications",
+    sub: "Every role you've applied to, in one place",
+  },
+  analytics: {
+    title: "Analytics",
+    sub: "Trends and insights across your pipeline",
+  },
+  settings: {
+    title: "Settings",
+    sub: "Preferences and data management",
+  },
+};
+
 function Header({
   jobs,
   onCreate,
@@ -21,7 +40,8 @@ function Header({
   isEditing,
   editingJob,
   onUpdate,
-  themeMode = "light",
+  activePage = "dashboard",
+  themeMode = "dark",
   onToggleTheme = () => {},
 }) {
   const [open, setOpen] = React.useState(false);
@@ -35,55 +55,91 @@ function Header({
     if (isEditing) onCancelEdit();
   };
 
-  return (
-    <header>
-      <img src="/logo.svg" alt="Job Tracker Logo" className="logo" />
-      <h3 className="label">Job Applications Tracker</h3>
+  const meta = PAGE_META[activePage] || PAGE_META.dashboard;
+  const showRowActions = activePage === "applications";
 
-      <nav className="actions">
+  return (
+    <header className="topbar">
+      <div className="topbar-titles">
+        <h3>{meta.title}</h3>
+        <p className="sub">{meta.sub}</p>
+      </div>
+
+      <nav className="actions" aria-label="Toolbar actions">
+        {showRowActions && (
+          <>
+            <button
+              type="button"
+              className="action action--ghost"
+              onClick={onEdit}
+              disabled={!canEdit || isEditing}
+              title={
+                !canEdit
+                  ? "Select a job first"
+                  : isEditing
+                  ? "Finish current edit first"
+                  : "Edit selected job"
+              }
+            >
+              <EditIcon fontSize="small" />
+              <span className="btn-label">Edit</span>
+            </button>
+
+            <button
+              type="button"
+              className="action action--ghost"
+              onClick={onDelete}
+              disabled={!canDelete || isEditing}
+              title={
+                !canDelete
+                  ? "Select a job first"
+                  : isEditing
+                  ? "Finish current edit first"
+                  : "Delete selected job"
+              }
+            >
+              <DeleteIcon fontSize="small" />
+              <span className="btn-label">Delete</span>
+            </button>
+          </>
+        )}
+
         <button
           type="button"
           className="action"
-          onClick={() => setOpen(true)}
-          disabled={isEditing}
-        >
-          <AddIcon fontSize="small" />
-          <span className="btn-label">{isEditing ? "Editing…" : "Add Job"}</span>
-        </button>
-
-        <button
-          type="button"
-          className="action action--ghost"
-          onClick={onEdit}
-          disabled={!canEdit || isEditing}
-          title={!canEdit ? "Select a job first" : isEditing ? "Finish current edit first" : "Edit selected job"}
-        >
-          <EditIcon fontSize="small" />
-          <span className="btn-label">Edit</span>
-        </button>
-
-        <button
-          type="button"
-          className="action action--ghost"
-          onClick={onDelete}
-          disabled={!canDelete || isEditing}
-          title={!canDelete ? "Select a job first" : isEditing ? "Finish current edit first" : "Delete selected job"}
-        >
-          <DeleteIcon fontSize="small" />
-          <span className="btn-label">Delete</span>
-        </button>
-
-        <button
-          type="button"
-          className="action action--ghost"
           onClick={() => exportJobsToCsv(jobs)}
+          disabled={!jobs || jobs.length === 0}
           title="Export to CSV"
         >
           <DownloadIcon fontSize="small" />
           <span className="btn-label">Export</span>
         </button>
 
-        
+        <button
+          type="button"
+          className="action action--icon"
+          onClick={onToggleTheme}
+          title={themeMode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label="Toggle color theme"
+        >
+          {themeMode === "dark" ? (
+            <LightModeIcon fontSize="small" />
+          ) : (
+            <DarkModeIcon fontSize="small" />
+          )}
+        </button>
+
+        <span className="topbar-divider" aria-hidden="true" />
+
+        <button
+          type="button"
+          className="action action--primary"
+          onClick={() => setOpen(true)}
+          disabled={isEditing}
+        >
+          <AddIcon fontSize="small" />
+          <span className="btn-label">{isEditing ? "Editing…" : "Add Job"}</span>
+        </button>
       </nav>
 
       <JobForm
