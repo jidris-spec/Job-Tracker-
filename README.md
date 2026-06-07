@@ -12,8 +12,7 @@ A simple, fast job application tracker. Add, edit, delete jobs; visualize your p
 - Zero-backend-ops: serverless functions under `my-app/api/`
 hosted on vercel
 
-https://job-tracker-2y7gpazeo-idris-projects-508cd8f1.vercel.app/
-
+https://job-tracker-o4ytev4t8-idris-projects-508cd8f1.vercel.app/
 ---
 
 ## Tech Stack
