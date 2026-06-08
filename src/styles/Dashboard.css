@@ -274,4 +274,23 @@
   .donut-wrap {
     height: 220px;
   }
+  .panel-head .hint {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    min-height: 220px;
+    padding: 12px 12px 6px;
+  }
+  .panel-body {
+    min-height: 160px;
+  }
+  .donut-wrap {
+    height: 180px;
+  }
+  .kpi-value {
+    font-size: 1.45rem;
+  }
 }

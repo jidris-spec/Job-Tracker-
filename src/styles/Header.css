@@ -41,7 +41,14 @@ header.topbar {
   align-items: center;
   gap: 8px;
   margin-left: auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.actions::-webkit-scrollbar {
+  display: none;
 }
 
 .action {
@@ -131,5 +138,22 @@ header.topbar {
   }
   .action.action--primary {
     padding: 9px 14px;
+  }
+  /* Export is accessible from Settings — hide it in the header to free space */
+  .header-export {
+    display: none;
+  }
+  .topbar-divider {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  /* Very small screens: make Add Job icon-only too */
+  .action.action--primary .btn-label {
+    display: none;
+  }
+  .action.action--primary {
+    padding: 9px;
   }
 }

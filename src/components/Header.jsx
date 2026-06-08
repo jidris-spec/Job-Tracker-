@@ -106,7 +106,7 @@ function Header({
 
         <button
           type="button"
-          className="action"
+          className="action header-export"
           onClick={() => exportJobsToCsv(jobs)}
           disabled={!jobs || jobs.length === 0}
           title="Export to CSV"
