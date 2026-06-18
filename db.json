@@ -1,40 +1,40 @@
 {
   "jobs": [
     {
-      "id": "59fd1820-75b7-44e2-bd80-2f50386d6ae4",
+      "id": "a7dd0e00-308d-4d39-adbc-72457f1ff503",
       "company": "jidtech",
-      "title": "internship",
+      "title": "frontend developer",
       "status": "Applied",
-      "date": "2025-09-21",
+      "date": "2026-06-13",
+      "link": "https://ieltsliz.com/",
+      "notes": "applied early"
+    },
+    {
+      "id": "06aa8399-9881-4b70-80ca-0f60d03d731c",
+      "company": "uius",
+      "title": "Trainee",
+      "status": "Applied",
+      "date": "2025-06-13",
       "link": "https://github.com/jidris-spec",
-      "notes": "my github"
+      "notes": "applied"
     },
     {
-      "id": "8197cbc3-1b87-4c7e-a4a3-1dd0f15f9d8e",
-      "company": "Ikra group of companies",
-      "title": "collaborator",
-      "status": "Offer",
-      "date": "2025-09-22",
-      "link": "https://stackoverflow.com/",
-      "notes": "intending to collaborate "
-    },
-    {
-      "id": "b7688891-9f94-49dc-b687-3491edabef22",
-      "company": "Accenture",
-      "title": "internship",
-      "status": "Interviewing",
-      "date": "2025-09-22",
-      "link": "https://www.accenture.com/ro-en/about/company-index?c=acn_glb_locationmarketiyext_14216771&n=otc_1224",
-      "notes": "optimistic"
-    },
-    {
-      "id": "06fe038b-be33-46d0-aca2-640456cc9e79",
-      "company": "updivision",
+      "id": "61f30c0a-fc7a-43c2-a668-365c8b8d5e1e",
+      "company": "kintech",
       "title": "intern",
-      "status": "Offer",
-      "date": "2026-06-01",
-      "link": "https://www.accenture.com/ro-en/about/company-index?c=acn_glb_locationmarketiyext_14216771&n=otc_1224",
-      "notes": "insha Allahu"
+      "status": "Interviewing",
+      "date": "2026-04-13",
+      "link": "https://github.com/",
+      "notes": "still waiting"
+    },
+    {
+      "id": "59da9376-dbc0-4326-b577-8a9c5a234656",
+      "company": "Genius software",
+      "title": "intern",
+      "status": "Interviewing",
+      "date": "2026-05-13",
+      "link": "https://ieltsliz.com/",
+      "notes": "waiting"
     }
   ],
   "settings": [

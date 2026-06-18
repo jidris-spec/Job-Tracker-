@@ -85,6 +85,29 @@ tbody tr.selected {
   text-decoration: underline;
 }
 
+.stale-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  margin-left: 6px;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: default;
+}
+
+[data-theme="dark"] .stale-badge {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
 .no-jobs {
   padding: 56px 24px;
   color: var(--muted);

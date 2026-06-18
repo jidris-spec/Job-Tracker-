@@ -4,6 +4,7 @@ import React, {
 } from "react";
 
 import { validateAndNormalizeUrl } from "../utils/validation";
+import StatusTimeline from "./StatusTimeline";
 
 import {
   Button,
@@ -18,6 +19,7 @@ import {
   InputLabel,
   FormControl,
   IconButton,
+  Divider,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -64,6 +66,9 @@ function JobForm({
     date: new Date()
       .toISOString()
       .slice(0, 10),
+    statusChangeDate: new Date()
+      .toISOString()
+      .slice(0, 10),
     link: "",
     notes: "",
   });
@@ -88,6 +93,9 @@ function JobForm({
           new Date()
             .toISOString()
             .slice(0, 10),
+        statusChangeDate: new Date()
+          .toISOString()
+          .slice(0, 10),
         link: rest.link || "",
         notes: rest.notes || "",
       });
@@ -97,6 +105,9 @@ function JobForm({
         title: "",
         status: "Applied",
         date: new Date()
+          .toISOString()
+          .slice(0, 10),
+        statusChangeDate: new Date()
           .toISOString()
           .slice(0, 10),
         link: "",
@@ -155,6 +166,10 @@ function JobForm({
         notes: form.notes,
       };
 
+      if (form.status !== jobToEdit.status) {
+        partial.statusDate = form.statusChangeDate;
+      }
+
       onUpdate?.(
         jobToEdit.id,
         partial
@@ -168,8 +183,12 @@ function JobForm({
     // CREATE MODE
     const job = {
       id: crypto.randomUUID(),
-      ...form,
+      company: form.company,
+      title: form.title,
+      status: form.status,
+      date: form.date,
       link: url,
+      notes: form.notes,
     };
 
     onCreate?.(job);
@@ -182,6 +201,9 @@ function JobForm({
       title: "",
       status: "Applied",
       date: new Date()
+        .toISOString()
+        .slice(0, 10),
+      statusChangeDate: new Date()
         .toISOString()
         .slice(0, 10),
       link: "",
@@ -319,6 +341,32 @@ function JobForm({
                 minRows={4}
                 fullWidth
               />
+
+              {jobToEdit && form.status !== jobToEdit.status && (
+                <TextField
+                  name="statusChangeDate"
+                  label={`Date moved to "${form.status}"`}
+                  type="date"
+                  value={form.statusChangeDate}
+                  onChange={handleChange}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                  required
+                />
+              )}
+
+              {jobToEdit && (() => {
+                const history = jobToEdit.statusHistory
+                  || (jobToEdit.status && jobToEdit.date
+                    ? [{ status: jobToEdit.status, date: jobToEdit.date }]
+                    : null);
+                return history && history.length > 0 ? (
+                  <>
+                    <Divider sx={{ borderColor: "var(--card-border)" }} />
+                    <StatusTimeline history={history} />
+                  </>
+                ) : null;
+              })()}
             </Stack>
           </DialogContent>
 

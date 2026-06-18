@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./styles/App.css";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import createAppTheme from "./theme.js";
-
+import KanbanBoard from "./components/KanbanBoard.jsx";
 import Header from "./components/Header.jsx";
 import JobList from "./components/JobList.jsx";
 import Dashboard from "./components/Dashboard.jsx";
@@ -28,7 +28,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
-
+    const [view, setView] = useState("table");
   const [mode, setMode] = useState(
     () => localStorage.getItem("theme") ?? "dark"
   );
@@ -180,67 +180,60 @@ export default function App() {
           )}
 
           {activePage === "applications" && (
-            <>
-              <div className="filters">
-                <div className="search-wrap">
-                  <SearchIcon fontSize="small" />
-                  <input
-                    className="search-input"
-                    type="search"
-                    placeholder="Search company or title..."
-                    value={query}
-                    onChange={(e) =>
-                      setQuery(e.target.value)
-                    }
-                  />
-                </div>
+  <>
+    <div className="filters">
 
-                <select
-                  className="filter-select"
-                  value={statusFilter}
-                  onChange={(e) =>
-                    setStatusFilter(e.target.value)
-                  }
-                >
-                  {[
-                    "All",
-                    "Applied",
-                    "Interviewing",
-                    "Offer",
-                    "Rejected",
-                  ].map((s) => (
-                    <option key={s} value={s}>
-                      {s === "All" ? "All statuses" : s}
-                    </option>
-                  ))}
-                </select>
+      {/* Add this toggle at the end of your filters div */}
+      <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+        <button
+          onClick={() => setView("table")}
+          style={{
+            padding: "6px 14px",
+            borderRadius: "8px",
+            border: "1px solid var(--card-border)",
+            background: view === "table" ? "var(--primary)" : "var(--card-bg)",
+            color: view === "table" ? "#fff" : "var(--fg)",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: 500,
+          }}
+        >
+          Table
+        </button>
+        <button
+          onClick={() => setView("board")}
+          style={{
+            padding: "6px 14px",
+            borderRadius: "8px",
+            border: "1px solid var(--card-border)",
+            background: view === "board" ? "var(--primary)" : "var(--card-bg)",
+            color: view === "board" ? "#fff" : "var(--fg)",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: 500,
+          }}
+        >
+          Board
+        </button>
+      </div>
+    </div>
 
-                <select
-                  className="filter-select"
-                  value={sortBy}
-                  onChange={(e) =>
-                    setSortBy(e.target.value)
-                  }
-                >
-                  <option value="newest">
-                    Newest first
-                  </option>
-
-                  <option value="oldest">
-                    Oldest first
-                  </option>
-                </select>
-              </div>
-
-              <main>
-                <JobList
-                  jobs={filtered}
-                  selectedJobId={selectedJobId}
-                  onSelect={setSelectedJobId}
-                />
-              </main>
-            </>
-          )}
+    <main>
+      {view === "table" ? (
+        <JobList
+          jobs={filtered}
+          selectedJobId={selectedJobId}
+          onSelect={setSelectedJobId}
+        />
+      ) : (
+        <KanbanBoard
+          jobs={filtered}
+          onUpdate={handleUpdateJob}
+        />
+      )}
+    </main>
+  </>
+)}
 
           {activePage === "analytics" && (
             <Analytics jobs={jobs} />

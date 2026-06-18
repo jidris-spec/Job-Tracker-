@@ -7,9 +7,12 @@ A simple, fast job application tracker. Add, edit, delete jobs; visualize your p
 ## Features
 - Create, edit, delete job applications (company, title, status, date, link, notes)
 - Status pipeline: Applied · Interviewing · Offer · Rejected
-- Dashboard charts (Recharts) to visualize your progress
+- Kanban board with drag-and-drop status changes
+- Application timeline: every status change is recorded with a date and shown as a visual history in the edit form
+- Dashboard charts (Recharts) and analytics to visualize your progress
+- CSV export of your job list
 - Light/Dark theme (stored via API)
-- Zero-backend-ops: serverless functions under `my-app/api/`
+- Zero-backend-ops: serverless functions under `api/`
 hosted on vercel
 
 https://job-tracker-o4ytev4t8-idris-projects-508cd8f1.vercel.app/
@@ -26,34 +29,45 @@ https://job-tracker-o4ytev4t8-idris-projects-508cd8f1.vercel.app/
 
 ## Project Structure
 ```
-my-app/
-  api/
-    _lib/
-      store.js            # storage helper (Vercel KV or in-memory fallback)
-    jobs/
-      index.js            # GET/POST /api/jobs
-      [id].js             # PATCH/DELETE /api/jobs/:id
-    settings/
-      [id].js             # GET/PATCH /api/settings/:id (only `1` is used)
-  src/
-    api.js                # frontend API client (BASE = "/api")
-    components/
-      Header.jsx
-      JobForm.jsx
-      JobList.jsx
-      Dashboard.jsx
-    styles/
-      App.css
-      Dashboard.css
-      JobList.css
-      Job.css
-      Header.css
-    App.jsx
-    main.jsx
-    index.css
-  vite.config.js          # dev proxy from /api -> http://localhost:3001
-  package.json
-  README.md
+api/
+  _lib/
+    store.js            # storage helper (Vercel KV or in-memory fallback)
+  jobs/
+    index.js            # GET/POST /api/jobs
+    [id].js             # PATCH/DELETE /api/jobs/:id
+  settings/
+    [id].js             # GET/PATCH /api/settings/:id (only `1` is used)
+src/
+  api.js                # frontend API client (BASE = "/api")
+  theme.js
+  components/
+    Header.jsx
+    Sidebar.jsx
+    JobForm.jsx
+    JobList.jsx
+    kanbanBoard.jsx
+    StatusTimeline.jsx  # renders a job's statusHistory as a vertical timeline
+    Dashboard.jsx
+    Analytics.jsx
+    Settings.jsx
+  utils/
+    stats.js
+    validation.jsx
+    exportCsv.js
+  styles/
+    App.css
+    Dashboard.css
+    JobList.css
+    Job.css
+    Header.css
+    Sidebar.css
+    Settings.css
+  App.jsx
+  main.jsx
+  index.css
+vite.config.js          # dev proxy from /api -> http://localhost:3001
+package.json
+README.md
 ```
 
 ---
@@ -81,7 +95,7 @@ This runs both the Vite app and your Vercel Functions locally.
 ```bash
 npm i -g vercel
 ```
-- From `my-app/` run:
+- From the project root run:
 ```bash
 vercel dev
 ```
@@ -96,8 +110,8 @@ Base URL is `/api` in production and local Vercel dev.
 
 - Jobs
   - `GET    /api/jobs`
-  - `POST   /api/jobs` (body: `{ id?: string, company, title, status, date, link, notes }`)
-  - `PATCH  /api/jobs/:id` (body: partial)
+  - `POST   /api/jobs` (body: `{ id?: string, company, title, status, date, link, notes }`) — server seeds `statusHistory: [{ status, date }]`
+  - `PATCH  /api/jobs/:id` (body: partial; include `incomingStatusDate` to date a status change explicitly) — appends a new `statusHistory` entry whenever `status` changes
   - `DELETE /api/jobs/:id`
 
 - Settings
@@ -137,7 +151,7 @@ Then redeploy. Without these, the API will use in-memory storage.
 ---
 
 ## Build & Deploy (Vercel)
-- Ensure your Vercel Project Root is the `my-app/` folder (so that `my-app/api/` is detected as functions).
+- Ensure your Vercel Project Root is this repo's root (so that `api/` is detected as functions).
 - Defaults:
   - Build Command: `npm run build`
   - Output Directory: `dist`
@@ -152,7 +166,7 @@ After deploy, verify in your browser DevTools → Network:
 
 ## Troubleshooting
 - **404 on `/api/...` in production**
-  - Your project root might not be `my-app/`, or functions aren’t in `my-app/api/`.
+  - Your Vercel project root might be misconfigured, or functions aren't in `api/`.
 - **500 on `/api/...`**
   - Check Vercel → Project → Deployments → latest → Function Logs.
   - Common causes:
@@ -170,7 +184,8 @@ After deploy, verify in your browser DevTools → Network:
 - `npm run dev` → Vite dev server
 - `npm run build` → Build the app (dist/)
 - `npm run preview` → Preview built app
-- `npm run api` → Run JSON Server on port 3001 (optional, for Vite-proxy dev)
+- `npm run api` / `npm run server` → Run JSON Server on port 3001 (optional, for Vite-proxy dev)
+- `npm run lint` → Run ESLint
 
 ---
 

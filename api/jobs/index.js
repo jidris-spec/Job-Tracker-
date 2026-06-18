@@ -34,14 +34,17 @@ export default async function handler(req, res) {
         res.status(400).json({ error: "Invalid JSON" });
         return;
       }
+      const status = payload.status || payload.currentStatus || "Applied";
+      const date = payload.date || payload.appliedDate || new Date().toISOString().slice(0, 10);
       const job = {
         id: payload.id || randomUUID(),
         company: payload.company || "",
         title: payload.title || "",
-        status: payload.status || "Applied",
-        date: payload.date || new Date().toISOString().slice(0, 10),
+        status,
+        date,
         link: payload.link || "",
         notes: payload.notes || "",
+        statusHistory: [{ status, date }],
       };
 
       const jobs = await store.getJobs();

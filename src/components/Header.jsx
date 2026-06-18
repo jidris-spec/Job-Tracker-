@@ -9,6 +9,14 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import {
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from "@mui/material";
 
 const PAGE_META = {
   dashboard: {
@@ -45,6 +53,7 @@ function Header({
   onToggleTheme = () => {},
 }) {
   const [open, setOpen] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   React.useEffect(() => {
     if (isEditing) setOpen(true);
@@ -88,7 +97,7 @@ function Header({
             <button
               type="button"
               className="action action--ghost"
-              onClick={onDelete}
+              onClick={() => setConfirmDelete(true)}
               disabled={!canDelete || isEditing}
               title={
                 !canDelete
@@ -151,6 +160,33 @@ function Header({
         jobToEdit={isEditing ? editingJob : null}
         onClose={handleClose}
       />
+
+      <Dialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete application?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will permanently remove the selected job. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              onDelete();
+              setConfirmDelete(false);
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </header>
   );
 }

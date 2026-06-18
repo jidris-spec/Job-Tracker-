@@ -2,6 +2,19 @@ import React from "react";
 import "../styles/JobList.css";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
+const STALE_DAYS = 7;
+const ACTIVE_STATUSES = new Set(["Applied", "Interviewing"]);
+
+function daysSince(dateStr) {
+  if (!dateStr) return 0;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
+}
+
+function lastActivityDate(job) {
+  const h = job.statusHistory;
+  return h && h.length > 0 ? h[h.length - 1].date : job.date;
+}
+
 function JobList({ jobs, selectedJobId, onSelect }) {
   if (jobs.length === 0) {
     return (
@@ -51,6 +64,15 @@ function JobList({ jobs, selectedJobId, onSelect }) {
                   <span className={`status-pill ${job.status}`}>
                     {job.status}
                   </span>
+                  {ACTIVE_STATUSES.has(job.status) &&
+                    daysSince(lastActivityDate(job)) >= STALE_DAYS && (
+                      <span
+                        className="stale-badge"
+                        title={`No response after ${daysSince(lastActivityDate(job))} days — consider following up`}
+                      >
+                        ⚠ {job.status === "Applied" ? "No response" : "Follow up"} · {daysSince(lastActivityDate(job))}d
+                      </span>
+                    )}
                 </td>
                 <td className="date-cell" data-label="Date">
                   {job.date}

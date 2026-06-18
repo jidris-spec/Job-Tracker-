@@ -35,7 +35,28 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "Not found" });
         return;
       }
-      const updated = { ...jobs[idx], ...partial };
+      const existing = jobs[idx];
+      const { statusDate: incomingStatusDate, ...cleanPartial } = partial;
+
+      let statusHistory = existing.statusHistory;
+      if (cleanPartial.status && cleanPartial.status !== existing.status) {
+        if (!statusHistory) {
+          statusHistory = [{ status: existing.status, date: existing.date }];
+        }
+        statusHistory = [
+          ...statusHistory,
+          {
+            status: cleanPartial.status,
+            date: incomingStatusDate || new Date().toISOString().slice(0, 10),
+          },
+        ];
+      }
+
+      const updated = {
+        ...existing,
+        ...cleanPartial,
+        ...(statusHistory !== undefined ? { statusHistory } : {}),
+      };
       jobs[idx] = updated;
       await store.setJobs(jobs);
       res.status(200).json(updated);
