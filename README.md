@@ -14,8 +14,7 @@ A simple, fast job application tracker. Add, edit, delete jobs; visualize your p
 - Light/Dark theme (stored via API)
 - Zero-backend-ops: serverless functions under `api/`
 hosted on vercel
-
-https://job-tracker-o4ytev4t8-idris-projects-508cd8f1.vercel.app/
+https://job-tracker-gilt-nine.vercel.app/
 ---
 
 ## Tech Stack
