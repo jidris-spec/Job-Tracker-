@@ -13,6 +13,8 @@ const COLORS = {
 function KanbanBoard({ jobs, onUpdate }) {
 
   const onDragEnd = (result) => {
+
+
     if (!result.destination) return;
 
     const jobId = result.draggableId;

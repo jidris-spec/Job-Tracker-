@@ -4,7 +4,7 @@
       "id": "a7dd0e00-308d-4d39-adbc-72457f1ff503",
       "company": "jidtech",
       "title": "frontend developer",
-      "status": "Applied",
+      "status": "Offer",
       "date": "2026-06-13",
       "link": "https://ieltsliz.com/",
       "notes": "applied early"
@@ -35,6 +35,33 @@
       "date": "2026-05-13",
       "link": "https://ieltsliz.com/",
       "notes": "waiting"
+    },
+    {
+      "id": "4fd55f3a-1a14-44ff-98e3-17af036e8dbd",
+      "company": "kingo",
+      "title": "frontend developer",
+      "status": "Offer",
+      "date": "2026-06-19",
+      "link": "https://github.com/",
+      "notes": "on hold"
+    },
+    {
+      "id": "8c5cb01a-3bfa-4bd7-a5be-d9916e193470",
+      "company": "comfort software",
+      "title": "intern",
+      "status": "Applied",
+      "date": "2026-06-19",
+      "link": "https://ieltsliz.com/",
+      "notes": "applied"
+    },
+    {
+      "id": "9704ff18-3a39-4304-ac8f-d2308ec72f17",
+      "company": "fintech",
+      "title": "intern",
+      "status": "Applied",
+      "date": "2026-06-21",
+      "link": "https://github.com/",
+      "notes": "noted"
     }
   ],
   "settings": [

@@ -1,6 +1,7 @@
 import React from "react";
 import "../styles/Header.css";
-
+import { useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import JobForm from "./JobForm";
 import exportJobsToCsv from "../utils/exportCsv";
 import AddIcon from "@mui/icons-material/Add";
@@ -37,6 +38,8 @@ const PAGE_META = {
   },
 };
 
+
+
 function Header({
   jobs,
   onCreate,
@@ -55,6 +58,11 @@ function Header({
   const [open, setOpen] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
+  const { logout } = useContext(AuthContext);
+
+  const handleLogout = () => {
+    logout();
+  };
   React.useEffect(() => {
     if (isEditing) setOpen(true);
   }, [isEditing]);
@@ -137,6 +145,20 @@ function Header({
             <DarkModeIcon fontSize="small" />
           )}
         </button>
+
+        <button 
+                onClick={handleLogout}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
+                  color: "var(--fg)",
+                  cursor: "pointer",
+                }}
+              >
+            Logout
+          </button>
 
         <span className="topbar-divider" aria-hidden="true" />
 

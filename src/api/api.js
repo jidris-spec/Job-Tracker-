@@ -1,13 +1,14 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "/api"; // fallback to proxy
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
 export const JobAPI = {
-  async list() {
-    const r = await fetch(`${API_BASE}/jobs`);
+  async list(userId) {
+    const r = await fetch(`${API_BASE}/users/${userId}/jobs`);
     if (!r.ok) throw new Error(`API ${r.status}`);
     return r.json();
   },
-  async create(job) {
-    const r = await fetch(`${API_BASE}/jobs`, {
+
+  async create(userId, job) {
+    const r = await fetch(`${API_BASE}/users/${userId}/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(job),
@@ -15,8 +16,9 @@ export const JobAPI = {
     if (!r.ok) throw new Error(`Create failed (${r.status})`);
     return r.json();
   },
-  async update(id, partial) {
-    const r = await fetch(`${API_BASE}/jobs/${id}`, {
+
+  async update(userId, id, partial) {
+    const r = await fetch(`${API_BASE}/users/${userId}/jobs/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(partial),
@@ -24,8 +26,9 @@ export const JobAPI = {
     if (!r.ok) throw new Error(`Update failed (${r.status})`);
     return r.json();
   },
-  async remove(id) {
-    const r = await fetch(`${API_BASE}/jobs/${id}`, { method: "DELETE" });
+
+  async remove(userId, id) {
+    const r = await fetch(`${API_BASE}/users/${userId}/jobs/${id}`, { method: "DELETE" });
     if (!r.ok) throw new Error(`Delete failed (${r.status})`);
     return true;
   },
@@ -36,7 +39,6 @@ export const ThemeAPI = {
     const r = await fetch(`${API_BASE}/settings/1`);
     if (!r.ok) throw new Error(`Theme fetch failed (${r.status})`);
     const data = await r.json();
-    // Map backend shape { id: 1, theme: "light" } -> { mode: "light" }
     return { mode: data.theme || "light" };
   },
   async set(mode) {
