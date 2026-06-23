@@ -1,50 +1,52 @@
-# Job Tracker (React + Vite + Vercel Serverless)
+# Job Tracker (React + Vite)
 
-A simple, fast job application tracker. Add, edit, delete jobs; visualize your pipeline; and persist a light/dark theme. The app is a React + Vite frontend with serverless API routes deployed on Vercel. Storage uses Vercel KV when configured, with an in-memory fallback for previews/local.
+A fast, modern job application tracker. Sign up, add/edit/delete jobs, visualize your pipeline on a Kanban board or table, track status-change history, and review your stats on Dashboard/Analytics pages. Authentication and job data are currently mocked client-side via `localStorage`, so the app runs fully standalone with no backend setup required.
+
+Live: https://job-tracker-gilt-nine.vercel.app/
 
 ---
 
 ## Features
+- Email/password signup & login (mock auth, scoped per browser via `localStorage`)
+- Per-user job storage — each account only sees its own jobs
 - Create, edit, delete job applications (company, title, status, date, link, notes)
 - Status pipeline: Applied · Interviewing · Offer · Rejected
 - Kanban board with drag-and-drop status changes
 - Application timeline: every status change is recorded with a date and shown as a visual history in the edit form
-- Dashboard charts (Recharts) and analytics to visualize your progress
+- Stale-application badges in the table view (flags active applications with no status change in 7+ days)
+- Dashboard charts (Recharts) and Analytics page (monthly trends, response/offer rate) to visualize your progress
 - CSV export of your job list
-- Light/Dark theme (stored via API)
-- Zero-backend-ops: serverless functions under `api/`
-hosted on vercel
-https://job-tracker-gilt-nine.vercel.app/
+- Light/Dark theme, persisted via `localStorage`
+
 ---
 
 ## Tech Stack
 - React 18 + Vite
 - Material UI (MUI)
 - Recharts
-- Vercel Serverless Functions (`my-app/api/`)
-- Vercel KV (optional persistence)
+- `@hello-pangea/dnd` for drag-and-drop
+- Mock auth + job storage backed by `localStorage` (see [Data & Persistence](#data--persistence))
 
 ---
 
 ## Project Structure
 ```
-api/
-  _lib/
-    store.js            # storage helper (Vercel KV or in-memory fallback)
-  jobs/
-    index.js            # GET/POST /api/jobs
-    [id].js             # PATCH/DELETE /api/jobs/:id
-  settings/
-    [id].js             # GET/PATCH /api/settings/:id (only `1` is used)
 src/
-  api.js                # frontend API client (BASE = "/api")
-  theme.js
+  api/
+    api.js              # JobAPI / ThemeAPI — frontend data client
+    mockAuth.js          # Mock auth backed by localStorage (signup/login/logout)
+    mockJobs.js          # Per-user job storage backed by localStorage
+  context/
+    AuthContext.jsx      # React context exposing { user, signup, login, logout }
+  pages/
+    LoginPage.jsx
+    SignupPage.jsx
   components/
     Header.jsx
     Sidebar.jsx
     JobForm.jsx
     JobList.jsx
-    kanbanBoard.jsx
+    KanbanBoard.jsx
     StatusTimeline.jsx  # renders a job's statusHistory as a vertical timeline
     Dashboard.jsx
     Analytics.jsx
@@ -61,10 +63,13 @@ src/
     Header.css
     Sidebar.css
     Settings.css
+  theme.js
   App.jsx
   main.jsx
   index.css
-vite.config.js          # dev proxy from /api -> http://localhost:3001
+api/                     # Legacy Vercel serverless functions (jobs/settings) — unused by the current
+                         # mock-auth build; kept for reference / future real-backend migration
+vite.config.js
 package.json
 README.md
 ```
@@ -72,122 +77,51 @@ README.md
 ---
 
 ## Local Development
-There are two recommended flows.
 
-### Option A: Vite dev + JSON Server (fastest UI loop)
-- Start the mock API (port 3001):
 ```bash
-npm run api
-```
-This runs `json-server --watch db.json --port 3001` (create a simple `db.json` with `{"jobs":[], "settings":[{"id":1, "theme":"dark"}]}` if you want to test this path). The Vite dev server proxies `/api` to `http://localhost:3001` per `vite.config.js`.
-
-- Start the frontend:
-```bash
+npm install
 npm run dev
 ```
-- Open http://localhost:5173
 
-### Option B: Full stack locally with Vercel Dev
-This runs both the Vite app and your Vercel Functions locally.
+Open http://localhost:5173, then sign up with any email/password (it's stored in `localStorage`) — or use the seeded demo account:
 
-- Install Vercel CLI:
-```bash
-npm i -g vercel
-```
-- From the project root run:
-```bash
-vercel dev
-```
-- Open the served URL. The `/api/*` routes are handled by your local serverless functions.
+- **Email:** `test@example.com`
+- **Password:** `password123`
 
-Note: Without Vercel KV env vars, data is in-memory and will reset on restarts/cold starts.
+No environment variables, database, or API server are required to run the app locally.
 
 ---
 
-## API Endpoints (Serverless)
-Base URL is `/api` in production and local Vercel dev.
+## Data & Persistence
 
-- Jobs
-  - `GET    /api/jobs`
-  - `POST   /api/jobs` (body: `{ id?: string, company, title, status, date, link, notes }`) — server seeds `statusHistory: [{ status, date }]`
-  - `PATCH  /api/jobs/:id` (body: partial; include `incomingStatusDate` to date a status change explicitly) — appends a new `statusHistory` entry whenever `status` changes
-  - `DELETE /api/jobs/:id`
+This build uses a fully mocked, client-side persistence layer:
 
-- Settings
-  - `GET    /api/settings/1` → `{ id: 1, theme: "light" | "dark" }`
-  - `PATCH  /api/settings/1` (body: `{ theme: "light" | "dark" }`)
+- **Auth** (`src/api/mockAuth.js`) — stores a list of users and the current session under `mock_users` / `current_user` in `localStorage`. Passwords are stored in plain text — this is a mock for demo/portfolio purposes only and is **not** suitable for production use.
+- **Jobs** (`src/api/mockJobs.js`) — stores each user's jobs under a `user_jobs_<uid>` key in `localStorage`, so different accounts in the same browser don't see each other's data.
+- **Theme** — persisted via `localStorage` (`theme` key), independent of the mock auth/job storage.
 
----
+Because everything lives in `localStorage`, data is per-browser and will be lost if the user clears site data. There is no cross-device sync.
 
-## Key Files (Serverless)
-- `api/_lib/store.js`
-  - Detects Vercel KV via env vars and uses it if available.
-  - Falls back to in-memory store for local/preview.
-  - Exports: `getJobs`, `setJobs`, `getSettings`, `setSettings` and `store` wrapper.
-
-- `api/jobs/index.js`
-  - `GET /api/jobs` returns array of jobs.
-  - `POST /api/jobs` creates a job. If `id` is missing, generates one via `randomUUID()` from `node:crypto`.
-
-- `api/jobs/[id].js`
-  - `PATCH /api/jobs/:id` partially updates a job.
-  - `DELETE /api/jobs/:id` removes a job.
-
-- `api/settings/[id].js`
-  - `GET /api/settings/1` returns theme.
-  - `PATCH /api/settings/1` updates theme.
-
----
-
-## Environment Variables (Optional KV persistence)
-Create a Vercel KV store and add the following env vars to your Vercel Project settings:
-- `KV_URL`
-- `KV_REST_API_URL`
-- `KV_REST_API_TOKEN`
-
-Then redeploy. Without these, the API will use in-memory storage.
-
----
-
-## Build & Deploy (Vercel)
-- Ensure your Vercel Project Root is this repo's root (so that `api/` is detected as functions).
-- Defaults:
-  - Build Command: `npm run build`
-  - Output Directory: `dist`
-- Push to `main` (or your chosen branch). Vercel will auto-deploy.
-
-After deploy, verify in your browser DevTools → Network:
-- `GET /api/settings/1` → 200 and JSON
-- `GET /api/jobs` → 200 and array
-- Create a job in the UI → `POST /api/jobs` → 201 and JSON
-
----
-
-## Troubleshooting
-- **404 on `/api/...` in production**
-  - Your Vercel project root might be misconfigured, or functions aren't in `api/`.
-- **500 on `/api/...`**
-  - Check Vercel → Project → Deployments → latest → Function Logs.
-  - Common causes:
-    - Wrong relative import to `../_lib/store.js`.
-    - UUID generation using `crypto.randomUUID` without importing. Use `import { randomUUID } from "node:crypto"`.
-    - Missing `@vercel/kv` dependency.
-- **Data resets on reload**
-  - You’re using the in-memory fallback. Configure Vercel KV env vars to persist.
-- **Local dev hitting 404 for `/api`**
-  - If using Vite dev without `vercel dev`, ensure json-server is running on port 3001 and the Vite proxy in `vite.config.js` is present.
+> The `api/` directory at the project root contains an earlier Vercel-serverless implementation (with optional Vercel KV persistence) that the app no longer calls into. It's kept for reference if/when the project migrates to a real backend.
 
 ---
 
 ## Scripts
 - `npm run dev` → Vite dev server
-- `npm run build` → Build the app (dist/)
+- `npm run build` → Build the app (`dist/`)
 - `npm run preview` → Preview built app
-- `npm run api` / `npm run server` → Run JSON Server on port 3001 (optional, for Vite-proxy dev)
 - `npm run lint` → Run ESLint
 
 ---
 
+## Roadmap / Known Limitations
+- Auth and job storage are mocked (`localStorage`) — not secure, not persisted across devices/browsers. Replacing this with a real backend (auth provider + database) is the main next step.
+- Search and status-filter state exist in `App.jsx` but aren't currently wired to visible UI controls.
+- No automated tests yet.
+
+See `PROJECT_DOCUMENTATION.md` for an in-depth, file-by-file walkthrough of the codebase, architecture review, and full improvement roadmap.
+
+---
 
 ## License
 MIT

@@ -68,13 +68,13 @@ function MainApp() {
 
   // CREATE
   const handleCreateJob = async (job) => {
-    const created = await JobAPI.create(job);
+    const created = await JobAPI.create(user.uid, job);
     setJobs((prev) => [created, ...prev]);
   };
 
   // UPDATE
   const handleUpdateJob = async (id, partial) => {
-    const updated = await JobAPI.update(id, partial);
+    const updated = await JobAPI.update(user.uid, id, partial);
     setJobs((prev) =>
       prev.map((j) => (j.id === id ? updated : j))
     );
@@ -82,7 +82,7 @@ function MainApp() {
 
   // DELETE
   const handleDeleteJob = async (id) => {
-    await JobAPI.remove(id);
+    await JobAPI.remove(user.uid,id);
     setJobs((prev) =>
       prev.filter((j) => j.id !== id)
     );
