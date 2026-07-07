@@ -1,109 +1,83 @@
 import React from "react";
-import "../styles/Dashboard.css";
-import getJobStats from "../utils/stats";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import getJobStats from "../utils/stats";
 
-const COLORS = {
-  Applied: "#3b82f6",
-  Interviewing: "#f59e0b",
-  Offer: "#22c55e",
-  Rejected: "#ef4444",
-};
-
-function getMonthlyData(jobs) {
-  const byMonth = {};
-  for (const job of jobs) {
-    const d = new Date(job.date);
-    if (isNaN(d)) continue;
-    const key = d.toLocaleDateString("en-US", {
-      month: "short",
-      year: "2-digit",
-    });
-    if (!byMonth[key]) {
-      byMonth[key] = {
-        month: key,
-        _sort: d.getFullYear() * 12 + d.getMonth(),
-        Applied: 0,
-        Interviewing: 0,
-        Offer: 0,
-        Rejected: 0,
-      };
-    }
-    if (byMonth[key][job.status] != null) byMonth[key][job.status]++;
-  }
-  return Object.values(byMonth).sort((a, b) => a._sort - b._sort);
-}
-
-function KPI({ label, value, meta, icon: Icon, tone }) {
-  return (
-    <div className="kpi">
-      <div className="kpi-top">
-        <span className="kpi-label">{label}</span>
-        {Icon && (
-          <span className={`kpi-icon ${tone || ""}`} aria-hidden="true">
-            <Icon fontSize="small" />
-          </span>
-        )}
-      </div>
+const KPI = ({ label, value, meta, icon: Icon, tone = "neutral" }) => (
+  <div className={`kpi ${tone}`}>
+    {Icon && <Icon className="kpi-icon" />}
+    <div>
+      <div className="kpi-label">{label}</div>
       <div className="kpi-value">{value}</div>
-      {meta && <div className="kpi-meta">{meta}</div>}
+      <div className="kpi-meta">{meta}</div>
     </div>
-  );
-}
+  </div>
+);
 
-export default function Analytics({ jobs = [] }) {
-  const { totals, successRate } = getJobStats(jobs);
-  const monthlyData = getMonthlyData(jobs);
+export default function Analytics({ jobs }) {
+  // CHANGE 1: Get the new data from stats
+  const { totals, successRate, responseByRole, interviewConversionRate, bestMonth } = getJobStats(jobs);
 
-  const responded = totals.Interviewing + totals.Offer + totals.Rejected;
-  const responseRate =
-    totals.total > 0 ? Math.round((responded / totals.total) * 100) : 0;
+  if (jobs.length === 0) {
+    return (
+      <div className="analytics-empty">
+        <p>No applications yet. Add some to see analytics!</p>
+      </div>
+    );
+  }
 
-  const pieData = [
+  const chartData = [
     { name: "Applied", value: totals.Applied },
     { name: "Interviewing", value: totals.Interviewing },
     { name: "Offer", value: totals.Offer },
     { name: "Rejected", value: totals.Rejected },
-  ].filter((d) => d.value > 0);
+  ];
 
-  const axisTick = { fill: "var(--muted)", fontSize: 12 };
+  const monthlyData = [];
+  const monthMap = {};
+  jobs.forEach((job) => {
+    const date = new Date(job.date);
+    const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    if (!monthMap[month]) {
+      monthMap[month] = { name: month, Applied: 0, Interviewing: 0, Offer: 0, Rejected: 0 };
+    }
+    monthMap[month][job.status]++;
+  });
+  Object.values(monthMap).forEach((m) => monthlyData.push(m));
+
+  const colors = {
+    Applied: "#3b82f6",
+    Interviewing: "#f59e0b",
+    Offer: "#10b981",
+    Rejected: "#ef4444",
+  };
 
   return (
-    <section className="dashboard">
+    <div className="analytics">
+      <div className="analytics-head">
+        <h2>Analytics</h2>
+        <p>Trends and insights across your pipeline</p>
+      </div>
+
+      {/* CHANGE 2: Updated KPI section with new cards */}
       <div className="kpis">
         <KPI
           label="Total Applications"
           value={totals.total}
           meta="All time"
-          icon={WorkOutlineIcon}
+          icon={null}
         />
         <KPI
           label="Response Rate"
-          value={`${responseRate}%`}
+          value={`${successRate}%`}
           meta="Heard back from employers"
           icon={TrendingUpIcon}
-          tone="interviewing"
+          tone="success"
         />
         <KPI
           label="Offer Rate"
-          value={`${successRate}%`}
+          value={`${Math.round((totals.Offer / totals.total) * 100)}%`}
           meta="Offers per application"
           icon={EmojiEventsIcon}
           tone="offer"
@@ -112,46 +86,57 @@ export default function Analytics({ jobs = [] }) {
           label="Rejected"
           value={totals.Rejected}
           meta="Part of the process"
-          icon={HighlightOffIcon}
-          tone="rejected"
+          icon={null}
         />
       </div>
 
-      <div className="panel-grid two">
+      {/* New KPI cards for Interview Conversion and Best Month */}
+      <div className="kpis">
+        <KPI
+          label="Interview Conversion"
+          value={`${interviewConversionRate}%`}
+          meta="Interviews that become offers"
+          icon={TrendingUpIcon}
+          tone="offer"
+        />
+        {bestMonth && (
+          <KPI
+            label="Best Month"
+            value={bestMonth.month}
+            meta={`${bestMonth.responseRate}% response rate (${bestMonth.count} apps)`}
+            icon={EmojiEventsIcon}
+            tone="offer"
+          />
+        )}
+      </div>
+
+      <div className="panels">
         <div className="panel">
           <div className="panel-head">
             <h3>Applications by Month</h3>
             <span className="hint">Status distribution over time</span>
           </div>
-          {monthlyData.length === 0 ? (
-            <div className="panel-empty">
-              No data yet. Add some jobs to see trends.
-            </div>
-          ) : (
-            <div className="panel-body">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={monthlyData}
-                  margin={{ top: 8, right: 8, left: -16, bottom: 4 }}
-                  barGap={2}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--card-border)"
-                    vertical={false}
-                  />
-                  <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={false} />
-                  <YAxis tick={axisTick} allowDecimals={false} tickLine={false} axisLine={false} />
-                  <Tooltip cursor={{ fill: "var(--primary-soft)" }} />
-                  <Legend wrapperStyle={{ paddingTop: 12 }} />
-                  <Bar dataKey="Applied" stackId="a" fill={COLORS.Applied} />
-                  <Bar dataKey="Interviewing" stackId="a" fill={COLORS.Interviewing} />
-                  <Bar dataKey="Offer" stackId="a" fill={COLORS.Offer} />
-                  <Bar dataKey="Rejected" stackId="a" fill={COLORS.Rejected} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <div className="panel-body">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                <XAxis dataKey="name" stroke="var(--fg-secondary)" />
+                <YAxis stroke="var(--fg-secondary)" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--card-bg)",
+                    border: "1px solid var(--card-border)",
+                    color: "var(--fg)",
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="Applied" fill={colors.Applied} />
+                <Bar dataKey="Interviewing" fill={colors.Interviewing} />
+                <Bar dataKey="Offer" fill={colors.Offer} />
+                <Bar dataKey="Rejected" fill={colors.Rejected} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <div className="panel">
@@ -159,40 +144,55 @@ export default function Analytics({ jobs = [] }) {
             <h3>Status Breakdown</h3>
             <span className="hint">Share of total</span>
           </div>
-          {pieData.length === 0 ? (
+          <div className="panel-body">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value">
+                  {chartData.map((entry) => (
+                    <Cell key={entry.name} fill={colors[entry.name]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--card-bg)",
+                    border: "1px solid var(--card-border)",
+                    color: "var(--fg)",
+                  }}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* CHANGE 3: New panel for Response Rate by Role */}
+        <div className="panel">
+          <div className="panel-head">
+            <h3>Response Rate by Role</h3>
+            <span className="hint">Which roles get more responses</span>
+          </div>
+          {Object.keys(responseByRole).length === 0 ? (
             <div className="panel-empty">No data yet.</div>
           ) : (
-            <div className="panel-body">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius="80%"
-                    innerRadius="52%"
-                    paddingAngle={2}
-                    stroke="none"
-                  >
-                    {pieData.map((entry) => (
-                      <Cell key={entry.name} fill={COLORS[entry.name]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend
-                    layout="horizontal"
-                    align="center"
-                    verticalAlign="bottom"
-                    wrapperStyle={{ paddingTop: 12 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="panel-body" style={{ padding: "20px" }}>
+              {Object.entries(responseByRole).map(([role, rate]) => (
+                <div
+                  key={role}
+                  style={{
+                    marginBottom: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>{role}</span>
+                  <span style={{ fontWeight: "bold", color: "var(--primary)" }}>{rate}%</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

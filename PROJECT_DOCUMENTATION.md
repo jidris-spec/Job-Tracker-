@@ -2,19 +2,45 @@
 
 > Written for a developer joining the team who is still learning React.
 > Every section explains things in plain English first, then in technical terms.
+>
+> **Updated:** this revision reflects the addition of a mocked authentication
+> system (signup/login/logout, per-user data namespacing) and an expanded
+> analytics engine (role-based response rates, interview conversion, best
+> month). The previous revision described a real fetch-based backend as the
+> live data layer — that is no longer accurate; see Section 0 and Section 4.
 
 ---
 
 ## 0. The Big Picture (read this first)
 
-Think of this app like a personal CRM for your job hunt. Instead of tracking customers, you track job applications: who you applied to, what stage you're at (Applied → Interviewing → Offer/Rejected), and notes about each one.
+Think of this app like a personal CRM for your job hunt. Instead of tracking
+customers, you track job applications: who you applied to, what stage you're
+at (Applied → Interviewing → Offer/Rejected), and notes about each one.
 
-It has two halves:
+It now has **three** conceptual layers, only two of which are actually live:
 
-1. **Frontend** (`src/`) — a React single-page app. This is "the building" — what the user sees and clicks.
-2. **Backend** (`api/`) — tiny serverless functions that store the data. This is "the filing cabinet" — where job records actually live.
+1. **Frontend UI** (`src/components`, `src/pages`) — what the user sees and
+   clicks.
+2. **Frontend "backend"** (`src/api`, `src/context`) — a client-side-only data
+   layer. Auth and job data both live in `localStorage`, wrapped behind small
+   API-shaped modules (`MockAuthAPI`, `MockJobsAPI`) so the rest of the app
+   *feels* like it's talking to a server, but no network request is ever made
+   for jobs or authentication.
+3. **Real backend** (`api/` at the project root, `db.json`, `json-server`) —
+   a genuine serverless API (Vercel functions + Vercel KV) that was clearly
+   the *original* plan. **The frontend no longer calls any of it.** It's fully
+   wired, deployable, and dead — a "filing cabinet" that's still standing in
+   the warehouse but nobody has the key to it anymore. This is the single
+   biggest architectural fact to understand about this codebase: it evolved
+   from "real backend" → "local-only mock," and the old backend was never
+   deleted (Section 7 covers why that matters).
 
-In local development, the filing cabinet is actually `json-server` reading from `db.json` (a fake REST API for prototyping). In production (Vercel), the filing cabinet becomes real serverless functions in `api/`, backed by Vercel KV (a cloud key-value store) or, if that's not configured, plain server memory (which resets every time the server restarts — more on this danger later).
+The app is also now gated behind a **login wall**: `App.jsx` renders either
+the signup/login screen or the real app, depending on whether `AuthContext`
+currently holds a `user`. Every job is stored under a per-user key
+(`user_jobs_<uid>`) in `localStorage`, so two different accounts on the same
+browser don't see each other's data — a real multi-tenancy instinct, even
+though the "backend" is just the browser's own storage.
 
 ---
 
@@ -23,11 +49,11 @@ In local development, the filing cabinet is actually `json-server` reading from 
 ```
 Job-Tracker-/
 ├── package.json                  # Project metadata, scripts, dependencies
-├── vite.config.js                # Build tool config + local API proxy
+├── vite.config.js                # Build tool config + local API proxy (now unused by the live app)
 ├── eslint.config.js              # Linting rules
-├── db.json                       # Fake database file for json-server (local dev only)
+├── db.json                       # Seed data for json-server — legacy, unused by the live app
 │
-├── api/                          # Backend — Vercel serverless functions
+├── api/                          # LEGACY — Vercel serverless backend, no longer called by the frontend
 │   ├── _lib/
 │   │   └── store.js              # Shared storage logic (KV or in-memory)
 │   ├── jobs/
@@ -39,26 +65,37 @@ Job-Tracker-/
 ├── dist/                         # Build output (generated, not hand-edited)
 │
 └── src/                          # Frontend — React application
-    ├── main.jsx                  # React entry point — boots the app into the DOM
-    ├── App.jsx                   # Root component — owns all global state
-    ├── api.js                    # Fetch wrapper — talks to the backend
+    ├── main.jsx                  # Entry point — boots the app into the DOM, wraps it in AuthProvider
+    ├── App.jsx                   # Auth gate + root "MainApp" component owning all app-wide state
     ├── theme.js                  # MUI theme factory (light/dark palettes)
     ├── index.css                 # Global resets
     │
+    ├── api/                      # Frontend's mocked data-access layer
+    │   ├── api.js                 # JobAPI (delegates to MockJobsAPI) + ThemeAPI (dead code, still fetch-based)
+    │   ├── mockAuth.js            # MockAuthAPI — fake signup/login/logout backed by localStorage
+    │   └── mockJobs.js            # MockJobsAPI — fake per-user job CRUD backed by localStorage
+    │
+    ├── context/
+    │   └── AuthContext.jsx        # Global auth state (user, signup, login, logout) via React Context
+    │
+    ├── pages/
+    │   ├── SignupPage.jsx         # The screen actually shown when logged out — handles BOTH signup and login
+    │   └── LoginPage.jsx          # A separate login-only screen — built, but never imported/rendered anywhere
+    │
     ├── components/
-    │   ├── Header.jsx             # Top bar: page title, Add/Edit/Delete/Export/Theme buttons
+    │   ├── Header.jsx             # Top bar: page title, Add/Edit/Delete/Export/Theme/Logout buttons
     │   ├── JobForm.jsx            # Modal dialog: create & edit job form
     │   ├── JobList.jsx            # Table view of all jobs ("Applications" page)
-    │   ├── kanbanBoard.jsx        # Drag-and-drop board view (Kanban) — note lowercase filename
+    │   ├── KanbanBoard.jsx        # Drag-and-drop board view (Kanban) — correctly cased now, see 2.13
     │   ├── Dashboard.jsx          # "Dashboard" page — KPIs + recent activity + donut chart
-    │   ├── Analytics.jsx          # "Analytics" page — monthly bar chart + breakdown pie chart
+    │   ├── Analytics.jsx          # "Analytics" page — monthly bar chart + role-based insights (expanded)
     │   ├── Settings.jsx           # "Settings" page — theme toggle + CSV export + summary stats
     │   ├── Sidebar.jsx            # Left navigation rail
     │   └── StatusTimeline.jsx     # Vertical timeline showing a job's status history
     │
     ├── utils/
     │   ├── validation.jsx         # URL validation/normalization (despite .jsx extension, no JSX inside)
-    │   ├── stats.js               # Pure function: jobs[] -> totals + success rate
+    │   ├── stats.js               # Pure function: jobs[] -> totals + success rate + role/time insights (expanded)
     │   └── exportCsv.js           # Converts jobs[] into a downloadable CSV file
     │
     └── styles/
@@ -66,7 +103,12 @@ Job-Tracker-/
         └── Settings.css, Sidebar.css      # Plain CSS, one file per component family
 ```
 
-**Analogy:** `src/` is the showroom floor of a car dealership (what customers interact with), `api/` is the warehouse and inventory system in the back (where the actual cars/data are kept), and `db.json` is a cardboard box standing in for the warehouse while you're still building it.
+**Analogy:** `src/` is the showroom floor of a car dealership (what customers
+interact with). `src/api` + `src/context` are a *prop* filing cabinet the
+showroom staff wheel around to look official — it's actually just a locked
+drawer in the showroom itself (`localStorage`), not a real warehouse. `api/`
+at the project root and `db.json` are the *real* warehouse that was built
+first, then abandoned when the team decided to demo everything client-side.
 
 ---
 
@@ -74,715 +116,890 @@ Job-Tracker-/
 
 ### 2.1 `src/main.jsx` — The Entry Point
 
-**Purpose:** This is the very first JavaScript that runs. Its only job is to find the `<div id="root">` in `index.html` and tell React "render the `<App />` component inside this DOM node." Every React app needs exactly one of these.
+**Purpose:** The first JavaScript that runs. Finds `<div id="root">` in
+`index.html` and tells React to render the component tree inside it.
 
-**Why it exists:** React doesn't automatically know where on the page it should draw itself. This file is the bridge between plain HTML and the React world.
+**What changed:** The tree mounted is no longer just `<App />` — it's now:
 
-**Imports:**
-- `React` — needed historically for JSX to work; with the modern JSX transform it's less strictly required, but `React.StrictMode` below needs the `React` namespace.
-- `ReactDOM` from `react-dom/client` — the modern (React 18) client rendering API. `createRoot` enables concurrent features. Without it, you could not mount a React tree onto the DOM at all — nothing would ever appear.
-- `App` — the root component (see below).
-- `./index.css` — global stylesheet, imported here so Vite bundles it into the page.
+```jsx
+<React.StrictMode>
+  <AuthProvider>
+    <App />
+  </AuthProvider>
+</React.StrictMode>
+```
 
-**What `React.StrictMode` does:** A wrapper that doesn't render any visible UI. It runs extra development-only checks (e.g., double-invoking some functions) to help you catch bugs like impure render functions. If removed, the app behaves identically in production but loses some dev-time safety nets.
+**Why `AuthProvider` wraps `App` here and not somewhere deeper:** Context
+providers only make their value available to *descendants*. Since `App.jsx`
+itself needs to read `user` from `AuthContext` (to decide whether to show the
+login screen or the real app), the provider must sit *above* `App` in the
+tree — wrapping it in `main.jsx` is the only place that guarantees that.
 
-**If this file were removed:** Nothing would ever render — you'd see a blank white page, because nothing tells React where to attach.
+**If this file were removed:** Nothing would ever render — blank white page.
 
 ---
 
-### 2.2 `src/App.jsx` — The Root / "Brain" Component
+### 2.2 `src/App.jsx` — Auth Gate + Root "Brain" Component
 
-**Purpose:** This is the central nervous system of the app. It owns *all* state that needs to be shared across pages: the list of jobs, which page is active, search/filter/sort settings, the currently selected job, edit mode, and the color theme. Every page (Dashboard, Applications, Analytics, Settings) is a child that receives data and callbacks from `App`.
+**Purpose:** This file now does two jobs stacked on top of each other:
 
-**Why it exists / problem it solves:** Without a single "owner" of shared state, every component would need its own copy of the jobs list, leading to inconsistent UI (e.g., deleting a job in one view but it still shows in another). This is the **"lifting state up"** pattern — when multiple components need the same data, you move that data to their closest common parent.
+1. **`App` (the default export)** — a thin **auth gate**. It reads `user`
+   from `AuthContext`. If there's no logged-in user, it renders `SignupPage`
+   and stops — nothing else in the app ever mounts. If there is a user, it
+   renders `MainApp`.
+2. **`MainApp` (an internal, unexported component)** — everything the
+   previous revision of this document described as "`App.jsx`": the central
+   nervous system owning `jobs`, `activePage`, selection state, edit state,
+   filters, and theme. Every page (Dashboard, Applications, Analytics,
+   Settings) is a child that receives data and callbacks from `MainApp`.
 
-**Imports explained:**
+```jsx
+export default function App() {
+  const { user } = useContext(AuthContext);
+  if (!user) return <SignupPage />;
+  return <MainApp />;
+}
+```
+
+**Why split into two components instead of an `if` inside one function:**
+`MainApp` calls hooks (`useState`, `useEffect`) unconditionally at its top
+level. If the gating logic and the job-tracking logic lived in one function,
+an early `return <SignupPage />` before those hooks ran would violate the
+Rules of Hooks the moment `user` changed from `null` to a real value (hooks
+must run in the same order on every render). Splitting into two components
+sidesteps that entirely — `MainApp` only ever mounts (and only ever calls its
+hooks) once a user exists.
+
+**Imports explained (delta from previous revision):**
+
 | Import | Why needed | If removed |
 |---|---|---|
-| `React, { useEffect, useMemo, useState }` | Hooks for state, side effects, memoized derived values | App couldn't hold state or react to changes — would crash on use of `useState` etc. |
-| `./styles/App.css` | Page-wide layout styles (`.layout`, `.main-content`, `.page`) | Layout would collapse, no spacing/structure |
-| `ThemeProvider, CssBaseline` from `@mui/material` | `ThemeProvider` injects the MUI theme object into every nested MUI component (via React Context). `CssBaseline` resets browser default styles (margins, font smoothing) consistently. | MUI components would fall back to default blue theme; inconsistent baseline styling across browsers |
-| `createAppTheme` from `./theme.js` | Builds the actual MUI theme object based on light/dark mode | No themed colors; everything reverts to MUI's defaults |
-| `KanbanBoard, Header, JobList, Dashboard, Analytics, Settings, Sidebar` | The child components rendered conditionally per page | App would have nothing to render — blank page |
-| `SearchIcon` from `@mui/icons-material/Search` | **Unused import** — not referenced anywhere in this file | Currently dead code; removing it does nothing but a smaller bundle |
-| `JobAPI` from `./api.js` | The object used to fetch/create/update/delete jobs from the backend | App couldn't load or persist any data — jobs list would always be empty |
+| `useContext` (added to the React import) | Reads `AuthContext` in both `App` and `MainApp` | `user` would be undefined; app would crash trying to destructure it |
+| `AuthContext` from `./context/AuthContext.jsx` | The source of truth for who's logged in | No way to gate the app — everyone would see `MainApp` immediately, and `user.uid` would be undefined everywhere it's used for data scoping |
+| `SignupPage` from `./pages/SignupPage.jsx` | The screen shown when logged out | Logged-out users would see a blank app instead of a way to sign up |
+| `JobAPI` from `./api/api.js` (moved from `./api.js`) | Same role as before — create/read/update/delete jobs | `MainApp` couldn't load or persist any data |
 
-**State Analysis (every `useState`):**
+Note the old `SearchIcon` unused import from `@mui/icons-material/Search` is
+**gone** — it's no longer present in the current file, so that particular
+piece of dead code has been cleaned up since the last revision.
 
-| State | Stores | Why needed | Who updates it | Who depends on it |
-|---|---|---|---|---|
-| `jobs` | Array of job objects | The single source of truth for all job data | `handleCreateJob`, `handleUpdateJob`, `handleDeleteJob`, and the initial load effect | Dashboard, Analytics, Settings, JobList (via `filtered`), KanbanBoard, Header (for export) |
-| `loading` | Boolean | Tracks whether the initial API fetch is still in flight, to show a loading message | The load effect (`setLoading(true)` then `false`) | The render logic (`{loading && ...}`) |
-| `error` | String | Holds an error message if the fetch fails | The load effect's `catch` block | The render logic (`{error && ...}`) |
-| `activePage` | String (`"dashboard"`, `"applications"`, `"analytics"`, `"settings"`) | Determines which "page" is currently shown — this app has no router, so this state variable *is* the router | `Sidebar` (via `setActivePage`) | `Header` (page title), the big conditional render block |
-| `selectedJobId` | String or `null` | Tracks which row in the table is currently selected/highlighted, so Edit/Delete know which job to act on | `JobList` (via `onSelect`), reset to `null` in `handleDeleteJob` if the deleted job was selected | `Header` (`canEdit`, `canDelete`), `JobList` (`selectedJobId` prop for highlighting) |
-| `isEditing` | Boolean | Whether the Add/Edit modal is currently in "edit an existing job" mode vs "create new" mode | `Header`'s `onEdit` handler sets it true; `onCancelEdit` sets it false | `Header` (disables Add button while editing), `JobForm` (via `jobToEdit`) |
-| `editingJob` | Job object or `null` | Holds a copy of the job being edited so the form can be pre-filled | Set by `onEdit` in `Header`'s props (look up by `selectedJobId`), cleared by `onCancelEdit` | `Header` passes it to `JobForm` as `jobToEdit` |
-| `query` | String | The current search box text | (Search input isn't shown in current JSX — likely controlled elsewhere or a leftover; see Weaknesses) | The `filtered` derived list |
-| `statusFilter` | String (`"All"`, `"Applied"`, etc.) | Which status the Applications table is filtered to | Not currently wired to any visible UI control in `App.jsx` (see Weaknesses) | The `filtered` derived list |
-| `sortBy` | String (`"newest"`/`"oldest"`) | Sort order for the table | Not currently wired to a UI control either | The `filtered` derived list |
-| `view` | String (`"table"`/`"board"`) | Whether the Applications page shows the table or the Kanban board | The Table/Board toggle buttons inline in JSX | Conditional render of `JobList` vs `KanbanBoard` |
-| `mode` | String (`"light"`/`"dark"`) | The current color theme, initialized from `localStorage` | `toggleTheme()` | `useEffect` (sets `data-theme` attribute), `muiTheme` memo, `Header`, `Settings` |
-
-> **Note for the interview:** `query`, `statusFilter`, and `sortBy` exist and are used in the `filtered` computation, but there's no visible search box or filter dropdown wired to them in the current `App.jsx` JSX. This is a real, callable-out weakness — see Engineering Assessment.
-
-**Effect Analysis (every `useEffect`):**
-
-1. **Theme-sync effect**
-   ```js
-   useEffect(() => {
-     document.documentElement.setAttribute("data-theme", mode);
-   }, [mode]);
-   ```
-   - **When it runs:** On first render, and again any time `mode` changes.
-   - **Why:** The CSS files use `[data-theme="dark"]` / `[data-theme="light"]` selectors (typical CSS custom-property theming approach) to flip color variables. This effect is the bridge between React state and that plain CSS mechanism.
-   - **Side effect:** Mutates the real DOM directly (`document.documentElement`), which is *outside* React's normal render output — exactly the kind of thing `useEffect` exists for.
-   - **Trigger:** `[mode]` dependency array — re-runs only when the theme changes, not on every render.
-
-2. **Initial data-load effect**
-   ```js
-   useEffect(() => {
-     (async () => {
-       try {
-         setLoading(true);
-         const data = await JobAPI.list();
-         setJobs(data);
-       } catch (e) {
-         setError(e.message || "Failed to load");
-       } finally {
-         setLoading(false);
-       }
-     })();
-   }, []);
-   ```
-   - **When it runs:** Exactly once, immediately after the component mounts (empty dependency array `[]`).
-   - **Why:** React components can't directly `await` inside their body — you can't make the render function itself asynchronous. So the standard pattern is: define an async IIFE (Immediately Invoked Function Expression) inside the effect and call it.
-   - **Side effects:** Network request to the backend; three state updates (`loading`, `jobs` or `error`).
-   - **Business problem solved:** On page load, the user should see their previously saved jobs, not an empty list. This effect is the "go fetch my data" step.
-
-**Function Analysis:**
-
-- **`handleCreateJob(job)`**
-  - Input: a new job object (built by `JobForm`).
-  - Calls `JobAPI.create(job)` → sends a POST request, awaits the server's response (the server may enrich the object, e.g., add `statusHistory`).
-  - Output/side effect: prepends the *server-returned* job (not the local one) to `jobs` via `setJobs((prev) => [created, ...prev])`. Using the server's version, not the client's, matters because the server might add fields like `statusHistory`.
-  - Business problem: Persisting a new application and reflecting it immediately in the UI without refetching the whole list.
-
-- **`handleUpdateJob(id, partial)`**
-  - Input: job `id` and a partial object of fields to change (e.g., `{ status: "Offer" }`).
-  - Calls `JobAPI.update(id, partial)` (PATCH request), awaits the updated job from the server.
-  - Side effect: replaces the matching job in `jobs` with the server's updated version via `.map`.
-  - Business problem: Both the "Edit Job" form *and* the Kanban drag-and-drop status changes funnel through this one function — it's the single front door for "change something about a job."
-
-- **`handleDeleteJob(id)`**
-  - Calls `JobAPI.remove(id)` (DELETE request).
-  - Side effect: removes the job from local `jobs` via `.filter`; if the deleted job was the selected one, clears `selectedJobId` so the UI doesn't point at a ghost row.
-  - Business problem: Permanently removing an application a user no longer wants to track, while keeping `selectedJobId` consistent (avoiding a dangling reference bug).
-
-- **`onCancelEdit()`** — resets `isEditing` and `editingJob` to their "off" states. Used when the user closes the modal without saving.
-
-- **`filtered` (derived, not a `useState`)**
-  - A plain expression recomputed on every render (no `useMemo`): filters `jobs` by `query` matching company or title (case-insensitive substring), then by `statusFilter`, then sorts by `date`.
-  - This is **derived state** — it's not stored separately; it's computed fresh from `jobs`, `query`, `statusFilter`, `sortBy` every render. That's the correct React pattern (don't duplicate state that can be computed).
-
-- **`toggleTheme()`** — flips `mode` between `"light"`/`"dark"`, persists the new value to `localStorage` so it survives a page refresh.
-
-- **`muiTheme = useMemo(() => createAppTheme(mode), [mode])`**
-  - `useMemo` caches the *expensive* theme-object creation so it's only recomputed when `mode` actually changes, not on every re-render of `App` (which happens often, e.g., every time `jobs` changes). Without it, every state update anywhere in `App` would rebuild the entire MUI theme object — wasteful but not catastrophic at this scale.
-
-**Component composition / JSX structure:**
-```
-ThemeProvider
- └─ CssBaseline
- └─ div.layout
-     ├─ Sidebar
-     └─ div.main-content
-         ├─ Header
-         └─ div.page
-             ├─ loading / error messages
-             └─ (conditional) Dashboard | Applications(JobList|KanbanBoard) | Analytics | Settings
-```
-
-**What App.jsx should own / should NOT own:**
-- ✅ Should own: jobs data, navigation state, selection state, theme state — anything more than one page needs.
-- ❌ Should *not* own: form-field-level state (that belongs in `JobForm`), per-row UI state like hover effects (belongs in `JobList`/`KanbanBoard`).
-
----
-
-### 2.3 `src/api.js` — The Network Layer
-
-**Purpose:** Centralizes every `fetch()` call to the backend. Instead of every component knowing the URL shape and HTTP verbs, they just call `JobAPI.create(job)` etc.
-
-**Why it exists:** If the API base URL or request shape changes, you change it in one place, not in every component. This is the **single responsibility** / **separation of concerns** principle — UI components shouldn't need to know about HTTP.
+**State Analysis — what's new:** All the state described in the previous
+revision (`jobs`, `loading`, `error`, `activePage`, `selectedJobId`,
+`isEditing`, `editingJob`, `query`, `statusFilter`, `sortBy`, `view`, `mode`)
+is unchanged in shape. What's new is that **every data operation is now
+scoped by `user.uid`**:
 
 ```js
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
-```
-- `import.meta.env` is Vite's way of exposing environment variables to the browser at build time. `VITE_API_BASE` lets you point at a different backend URL in different deployments; falling back to `/api` means "use whatever this app is hosted on" (works with the Vite dev proxy or Vercel's same-origin functions).
+const { user } = useContext(AuthContext); // inside MainApp too
 
-**`JobAPI` object — methods:**
-- `list()` — GET `/api/jobs`. Throws if `!r.ok` (any non-2xx status), otherwise resolves to the parsed JSON array.
-- `create(job)` — POST with JSON body, throws on failure, returns the created job from the server.
-- `update(id, partial)` — PATCH with a partial object — only the fields that changed.
-- `remove(id)` — DELETE; returns `true` rather than parsing a body (DELETE here responds 204 No Content).
-
-**`ThemeAPI`** — exists but is **never imported/used** anywhere in the current `src/` code (theme is persisted via `localStorage` instead, in `App.jsx`). This is dead/unused code — likely a remnant of an earlier approach to syncing theme through the backend, before `localStorage` was adopted. Worth flagging in code review.
-
-**If `api.js` were removed:** No component could talk to the backend at all; `App.jsx`'s data-load effect would throw `JobAPI is not defined`.
-
----
-
-### 2.4 `src/theme.js` — MUI Theme Factory
-
-**Purpose:** A pure function `createAppTheme(mode)` that returns a complete MUI theme object — colors, typography, and default component style overrides — for either light or dark mode.
-
-**Plain English analogy:** Think of this as a paint mixing recipe. Given "light" or "dark," it returns the exact palette (primary blue, background, text colors) and a few default styling rules (rounded corners, no shadow on buttons) that every MUI component in the app will use automatically.
-
-**Why it's a function and not a static object:** Because two themes (light/dark) share most of their *structure* (same shape, same component overrides) but differ in *values*. A factory function avoids duplicating that structure.
-
-**Key sections:**
-- `palette` — defines `primary`, `secondary`, `error/warning/success/info`, `background`, `text`, `divider` colors, swapping values based on `isDark`.
-- `typography.fontFamily` — sets the global font stack (Inter first).
-- `shape.borderRadius` — global corner rounding (12px) applied to MUI components by default.
-- `components` — per-component default prop/style overrides: e.g. every `<Button>` defaults to `variant="contained"`, has no text-transform (MUI defaults to uppercase button text — this disables that), and a custom border radius. `MuiPaper` gets a 1px border so cards look "card-like" instead of relying purely on shadows.
-
-**If removed:** `App.jsx`'s `createAppTheme` import would fail to resolve; the whole app would crash at build time.
-
----
-
-### 2.5 `src/components/Header.jsx` — Top Bar / Toolbar
-
-**Purpose:** Shows the current page's title/subtitle and a row of action buttons (Edit, Delete, Export, Theme toggle, Add Job) that change depending on context. It also hosts the `JobForm` modal and the delete-confirmation dialog — meaning the *trigger buttons* live here, but the actual *create/edit form* and *delete confirmation UI* are rendered as children, conditionally shown.
-
-**Why it exists:** Keeps page-level chrome (titles, global actions) separate from page *content* (Dashboard/JobList/etc). This is a classic **toolbar pattern**.
-
-**Imports:**
-- `JobForm` — the modal dialog component this Header controls.
-- `exportJobsToCsv` — utility function, called directly on click (not a prop passed down further — Header owns the "Export" button entirely).
-- MUI icon components (`AddIcon`, `EditIcon`, etc.) — visual icons for each button; purely presentational.
-- MUI `Button`, `Dialog*` components — used to build the delete-confirmation dialog.
-
-**`PAGE_META`** — a static lookup object mapping page key → `{ title, sub }`. This avoids a chain of `if/else` in the JSX; it's a clean **derived-state-via-lookup-table** pattern.
-
-**Props received (Props Analysis):**
-
-| Prop | Source | Data or callback? | Effect on rendering |
-|---|---|---|---|
-| `jobs` | `App.jsx` state | Data | Used to enable/disable the Export button (`jobs.length === 0`) |
-| `onCreate` | `App.handleCreateJob` | Callback | Passed straight through to `JobForm` |
-| `onUpdate` | Inline wrapper in `App.jsx` that calls `handleUpdateJob` then `onCancelEdit` | Callback | Passed to `JobForm`; closes edit mode after saving |
-| `onEdit` | Inline function in `App.jsx` that looks up the selected job and sets `editingJob`/`isEditing` | Callback | Wired to the Edit button's `onClick` |
-| `onDelete` | Inline function in `App.jsx` calling `handleDeleteJob(selectedJobId)` | Callback | Wired to the delete-confirm dialog's Delete button |
-| `onCancelEdit` | `App.onCancelEdit` | Callback | Used when modal closes without saving |
-| `canEdit` / `canDelete` | `Boolean(selectedJobId)` computed in `App.jsx` | Data | Disables Edit/Delete buttons when nothing is selected |
-| `isEditing` | `App.jsx` state | Data | Disables Add button, controls a `useEffect` that auto-opens the modal |
-| `editingJob` | `App.jsx` state | Data | Passed to `JobForm` as `jobToEdit` (only when `isEditing`) |
-| `activePage` | `App.jsx` state | Data | Looks up `PAGE_META`, decides whether to show row actions (`showRowActions`) |
-| `themeMode` | `App.jsx` state (`mode`) | Data | Decides which icon (sun/moon) to show |
-| `onToggleTheme` | `App.toggleTheme` | Callback | Wired to the theme button |
-
-**Local state:**
-- `open` (useState) — controls whether the `JobForm` dialog is visible. Owned locally because *Header* is responsible for the Add/Edit modal's open/closed UI state, even though the *data* inside the form is owned by `JobForm` itself.
-- `confirmDelete` (useState) — controls the delete-confirmation dialog's visibility, a separate concern from the form modal.
-
-**Effect:**
-```js
 useEffect(() => {
-  if (isEditing) setOpen(true);
-}, [isEditing]);
-```
-- **When:** Runs whenever `isEditing` changes.
-- **Why:** When the parent sets `isEditing = true` (user clicked "Edit"), this effect ensures the modal actually opens, since `open` is local state that the parent can't set directly.
-- This is a **derived-open-state synchronization** pattern — slightly indirect, but necessary because `open` must support being toggled by Header's own "Add Job" button too (which doesn't go through `isEditing`).
+  if (!user) return; // guards against a stale render before logout finishes
+  (async () => {
+    setLoading(true);
+    const data = await JobAPI.list(user.uid);
+    setJobs(data);
+    ...
+  })();
+}, [user]);
 
-**Function: `handleClose()`**
-- Closes the dialog (`setOpen(false)`), and if it was in edit mode, calls `onCancelEdit()` to clear `editingJob`/`isEditing` in the parent. Without this, closing the dialog mid-edit (e.g. clicking outside it) would leave `isEditing` stuck `true`, disabling the Add button forever.
+const handleCreateJob = async (job) => {
+  const created = await JobAPI.create(user.uid, job);
+  ...
+};
+```
+
+- **Why `[user]` is now a dependency of the load effect:** If a different
+  account logs in without a full page reload, this effect needs to re-run and
+  fetch *that* user's jobs instead of continuing to show the previous user's
+  in-memory `jobs` state.
+- **Why the guard `if (!user) return;`:** Because `MainApp` only ever renders
+  when `user` is truthy (enforced by the `App` gate above), this guard is
+  technically redundant in normal operation — but it's a defensive line
+  against the brief render that happens *during* `logout()` before `App`
+  swaps back to `SignupPage`, preventing a call to `JobAPI.list(undefined)`.
+
+**`handleUpdateJob`/`handleDeleteJob`:** Unchanged in shape from the previous
+revision, except every `JobAPI` call now takes `user.uid` as its first
+argument, so a user can never accidentally read or mutate another account's
+localStorage-namespaced job list.
+
+**Everything else** (the `filtered` derived list, `toggleTheme`, the
+`muiTheme` memo, the JSX composition of `Sidebar`/`Header`/pages, the
+Table/Board toggle) is materially unchanged from the previous revision — see
+Section 4 for the updated ownership diagram.
+
+**Still true (not fixed):** `query`, `statusFilter`, and `sortBy` exist and
+feed the `filtered` computation, but there is still no visible search box or
+filter dropdown wired to them anywhere in `MainApp`'s JSX. This was flagged
+before and remains an open issue (Section 7).
 
 ---
 
-### 2.6 `src/components/JobForm.jsx` — Create/Edit Modal
+### 2.3 `src/context/AuthContext.jsx` — Global Auth State (NEW)
 
-**Purpose:** A single reusable dialog that handles **both** creating a new job and editing an existing one. Whether it's in "create" or "edit" mode is determined entirely by whether `jobToEdit` is truthy.
+**Purpose:** The React Context that makes "who is logged in" available to any
+component in the tree without manually passing it down through props —
+`App.jsx` needs it for gating, `Header.jsx` needs it to wire up the Logout
+button, and neither is a direct parent/child of the other.
 
-**Why one component for both:** Create and Edit forms have nearly identical fields. Duplicating them into `CreateJobForm` and `EditJobForm` would mean every field change must be made twice. This is **component reuse via conditional behavior** — a single source of truth for "what does a job form look like."
-
-**Props (Props Analysis):**
-
-| Prop | Source | Type | Purpose |
-|---|---|---|---|
-| `onCreate` | `Header` → `App.handleCreateJob` | Callback | Called on submit when creating |
-| `onUpdate` | `Header` → wrapped `App.handleUpdateJob` | Callback | Called on submit when editing |
-| `open` / `setOpen` | `Header`'s local state | Data + callback (controlled component pattern) | Lets the *parent* control visibility — see "Controlled vs Uncontrolled" below |
-| `hideTrigger` | `Header` passes `true` | Data | Suppresses the form's own "+ Add Job" trigger button, since Header has its own |
-| `jobToEdit` | `Header`'s `editingJob` (or `null`) | Data | Determines create vs edit mode and pre-fills the form |
-| `onClose` | `Header.handleClose` | Callback | Notifies the parent when the dialog closes (for any cleanup) |
-
-**The "controlled vs uncontrolled" trick:**
+**Shape:**
 ```js
-const [internalOpen, setInternalOpen] = useState(false);
-const open = externalOpen ?? internalOpen;
-const setOpen = setExternalOpen ?? setInternalOpen;
+export const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const currentUser = MockAuthAPI.getCurrentUser();
+    setUser(currentUser);
+    setLoading(false);
+  }, []);
+
+  const signup = async (email, password) => { ... };
+  const login  = async (email, password) => { ... };
+  const logout = () => { MockAuthAPI.logout(); setUser(null); };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, error, signup, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
 ```
-This makes `JobForm` dual-mode: if a parent passes `open`/`setOpen`, the component is **controlled** (parent owns the truth). If not, it manages its own `internalOpen` state and is **uncontrolled** (self-sufficient, usable standalone with its own "+ Add Job" button). This is a well-known React pattern for building flexible reusable components.
 
-**State (`useState`):**
-- `form` — the entire form's field values as one object (`company`, `title`, `status`, `date`, `statusChangeDate`, `link`, `notes`). Storing all fields in one object (rather than 7 separate `useState` calls) keeps `handleChange` generic (one handler for every input via `name`).
-- `linkError` — validation error message specifically for the URL field, shown as MUI `TextField` helper text.
+**The mount-time effect:** Runs once, checks `localStorage` (via
+`MockAuthAPI.getCurrentUser()`) for an already-logged-in session, and
+restores it into state. This is what makes a page refresh **not** log the
+user out — without it, `user` would always start `null` and every refresh
+would dump you back to the signup screen even with valid session data sitting
+in storage.
 
-**Effect: populate form when editing**
+**Why `signup`/`login` wrap their calls in `try/catch` and re-throw:** They
+update `error` state (for anyone who wants to read it from context) *and*
+re-throw, so the calling component (`SignupPage`) can also catch the error
+locally and show it inline next to the form — both the global `error` and a
+local one end up set, which is slightly redundant (see Section 7) but
+harmless.
+
+**Note:** `loading` and `error` are exposed on the context but **`loading` is
+never read anywhere else in the app** — `App.jsx`'s gate checks `user`
+directly, not `loading`, so there's a theoretical flash-of-signup-page on
+first load before the mount effect finishes (in practice it resolves
+synchronously from `localStorage`, so this is invisible, but it's not
+actually guarded against).
+
+**If this file were removed:** `App.jsx`, `Header.jsx`, `SignupPage.jsx`, and
+`LoginPage.jsx` would all fail to import `AuthContext` and crash at build
+time.
+
+---
+
+### 2.4 `src/pages/SignupPage.jsx` — The Actual Logged-Out Screen
+
+**Purpose:** The only auth screen actually wired into the app. Despite the
+name, it handles **both** signup and login behind a single `isSignup`
+boolean toggle — clicking "Sign Up" / "Login" at the bottom of the form flips
+which mode it's in and which `AuthContext` function (`signup` vs `login`) the
+form submits to.
+
+**Why one component for both, rather than routing to `LoginPage.jsx`:**
+There's no router in this app (Section 7), so "navigating" to a login screen
+would mean more `activePage`-style string-state plumbing. Toggling a boolean
+inside one component sidesteps that entirely — cheap and effective, though it
+does mean `LoginPage.jsx` sitting right next to it is now orphaned (Section
+2.5).
+
+**Local state:** `email`, `password`, `error` (a local copy, redundant with
+`AuthContext`'s `error` — see 2.3), `isSignup`.
+
+**`handleSubmit`:**
 ```js
-useEffect(() => {
-  if (!open) return;
-  if (jobToEdit) { ...prefill from jobToEdit... }
-  else { ...reset to blank defaults... }
-  setLinkError("");
-}, [open, jobToEdit]);
+if (isSignup) {
+  await signup(email, password);
+} else {
+  await login(email, password);
+}
 ```
-- **When:** Runs whenever the dialog opens/closes or which job is being edited changes.
-- **Why:** Each time the dialog opens, the form must reflect either the selected job's current data (edit mode) or blank defaults (create mode). Without this, opening the form a second time would still show the previous session's leftover values.
-- **Side effect:** Pure state update, no I/O.
+On success, nothing further happens here — `AuthContext.signup`/`login`
+already called `setUser(...)` internally, which flips `App.jsx`'s gate and
+unmounts `SignupPage` in favor of `MainApp` automatically. `SignupPage`
+itself never needs to know that happened; it just stops being rendered.
 
-**Function: `handleChange(e)`**
-- Generic input handler: reads `e.target.name` and `e.target.value`, updates the corresponding key in `form` via spread (`{ ...prev, [name]: value }`). This is the textbook **controlled input** pattern — every `<TextField>`'s `value` comes from React state, and every keystroke updates that state via `onChange`.
-- Also clears `linkError` as soon as the user starts retyping the link field, so the error message doesn't stay stuck after they begin fixing it.
+**Demo credentials hint:** The form displays `test@example.com` /
+`password123` under the Login mode — this matches the seed account
+`MockAuthAPI` creates automatically on first use (see 2.7).
 
-**Function: `handleSubmit(e)`**
-1. `e.preventDefault()` — stops the browser's native form submission (which would reload the page).
-2. Validates/normalizes the URL via `validateAndNormalizeUrl(form.link)` (see `utils/validation.jsx`).
-3. If there's an error, sets `linkError` and **returns early** — nothing is created/updated, the dialog stays open so the user can fix it.
-4. **Edit branch** (`if (jobToEdit)`): builds a `partial` object of changed fields. Critically, **if the status field changed**, it adds `partial.statusDate = form.statusChangeDate` — this tells the backend "record a new status-history entry dated this." Then calls `onUpdate(jobToEdit.id, partial)` and closes the dialog.
-5. **Create branch:** builds a brand-new job object including a client-generated `id` via `crypto.randomUUID()` (Web Crypto API, built into modern browsers — generates a cryptographically random UUID with no library needed), calls `onCreate(job)`, closes the dialog, and resets the form back to blanks.
+**UX/code-quality note:** All styling here is inline `style={{...}}` objects,
+unlike every other page/component in the app, which uses `.css` files. This
+is a genuine inconsistency (see Section 7) — likely because this screen was
+built quickly as a functional stopgap rather than polished to match the rest
+of the app's design system.
 
-**Business problem solved:** This single function is the gatekeeper for data integrity entering the system — it's the only path through which a job is created or modified, and it's where the "did the status change? then record history" business rule lives.
+---
 
-**The "status change date" UI (conditional rendering):**
-```jsx
-{jobToEdit && form.status !== jobToEdit.status && (
-  <TextField name="statusChangeDate" label={`Date moved to "${form.status}"`} .../>
-)}
+### 2.5 `src/pages/LoginPage.jsx` — Orphaned Component (NEW file, unused)
+
+**Purpose (as written):** A login-only form — same fields, same
+`AuthContext.login` call — structurally almost identical to `SignupPage.jsx`
+with `isSignup` hardcoded away.
+
+**Why it's dead code:** Nothing in the app imports it. `App.jsx` only ever
+renders `SignupPage` for logged-out users, and `SignupPage` already contains
+a full login flow internally. `LoginPage.jsx` was very likely an earlier
+attempt at splitting signup/login into two screens that was abandoned in
+favor of the toggle-based single screen, and never deleted.
+
+**Risk of leaving it in place:** None functionally (it's never imported, so
+it can't run), but it's a maintenance trap — a future developer might edit
+`LoginPage.jsx` expecting their change to take effect, and be confused when
+nothing changes in the running app. Should be deleted or explicitly wired up
+via a real router (Section 9).
+
+---
+
+### 2.6 `src/api/api.js` — The (Now Partially Fake) Network Layer
+
+**Purpose:** Previously (see the earlier revision of this document) this was
+a thin `fetch()` wrapper hitting a real backend. It has been rewritten:
+
+```js
+import { MockJobsAPI } from "./mockJobs";
+
+export const JobAPI = {
+  async list(userId)            { return MockJobsAPI.getJobs(userId); },
+  async create(userId, job)     { return MockJobsAPI.createJob(userId, job); },
+  async update(userId, id, p)   { return MockJobsAPI.updateJob(userId, id, p); },
+  async remove(userId, id)      { return MockJobsAPI.deleteJob(userId, id); },
+};
+
+export const ThemeAPI = {
+  async get()      { /* still does a real fetch to /api/settings/1 */ },
+  async set(mode)  { /* still does a real fetch to /api/settings/1 */ },
+};
 ```
-Only appears while editing an existing job *and* the user has picked a different status than what it currently has. This is **derived/conditional rendering** driven by comparing two pieces of state (`form.status` vs `jobToEdit.status`), not a separate boolean flag — a good example of not over-engineering state.
 
-**`StatusTimeline` embed:** Also only shown while editing, and only if there's history to show. It builds a fallback single-entry history from `jobToEdit.status`/`date` if the job predates the `statusHistory` feature (defensive backward-compatibility logic for old data).
+**What actually changed:** `JobAPI` no longer performs any `fetch()` call at
+all — every method is `async` only for interface-compatibility with callers
+that `await` it; internally it's a synchronous `localStorage` read/write via
+`MockJobsAPI`. The **shape** callers depend on (`list`, `create`, `update`,
+`remove`, all taking a `userId` first) is preserved, which is exactly why
+`App.jsx` didn't need to change its calling convention beyond adding
+`user.uid` as an argument — a real, if accidental, demonstration of why the
+adapter/facade pattern is valuable: the data source was swapped out entirely
+and the rest of the app didn't notice.
 
----
+**`ThemeAPI` is still present, still does real `fetch()` calls to
+`/api/settings/1`, and is still never imported or called anywhere in the
+app** (theme persists via `localStorage` directly in `App.jsx`, same as
+before). This is now doubly dead: not only is it unused, but even if
+something did call it, it would be hitting an `api/settings/[id].js`
+endpoint that nothing serves in the current deployment model.
 
-### 2.7 `src/components/JobList.jsx` — Table View
-
-**Purpose:** Renders the full table of jobs on the "Applications" page in table form, with row selection and a "stale" warning badge for applications that have sat too long without status movement.
-
-**Module-level constants:**
-- `STALE_DAYS = 7` — business rule constant: after a week with no status change, flag it.
-- `ACTIVE_STATUSES = new Set(["Applied", "Interviewing"])` — only these statuses can go "stale" (an Offer or Rejection is already resolved, so staleness is irrelevant).
-
-**Function: `daysSince(dateStr)`**
-- Input: an ISO date string.
-- Computes whole days between now and that date using millisecond math (`86_400_000` ms = 1 day). The underscore in `86_400_000` is a JS numeric separator for readability — purely cosmetic, doesn't affect the value.
-- Returns 0 if no date given.
-
-**Function: `lastActivityDate(job)`**
-- Returns the date of the most recent entry in `job.statusHistory` if it exists, otherwise falls back to `job.date` (the original application date). This means staleness is measured from the *last status change*, not the original apply date — a more accurate "how long has this been sitting idle" measure.
-
-**Component logic:**
-- Early return: if `jobs.length === 0`, shows a friendly empty-state message instead of an empty table.
-- Otherwise renders a `<table>` with one `<tr>` per job. Clicking a row toggles selection: `onSelect(job.id === selectedJobId ? null : job.id)` — clicking the already-selected row deselects it (a toggle, not just a "select").
-- The status cell shows a colored pill (`status-pill` class + status name) and, conditionally, a "stale badge" warning if the job is in an active status and has been inactive ≥7 days.
-- The link cell either renders a clickable "Open ↗" anchor (with `e.stopPropagation()` so clicking the link doesn't also trigger row selection) or an em-dash placeholder if there's no link.
-
-**Props:**
-| Prop | Source | Type | Effect |
-|---|---|---|---|
-| `jobs` | `App.jsx`'s `filtered` | Data | The rows to render |
-| `selectedJobId` | `App.jsx` state | Data | Highlights the selected row (`selected` class) |
-| `onSelect` | `App.jsx`'s `setSelectedJobId` | Callback | Fired on row click |
-
-**What this component should/should not own:** Should own purely presentational/derived logic (staleness calculation, formatting). Should **not** own the actual jobs array or selection state — those are lifted to `App.jsx` because `Header` also needs to know what's selected.
+**If `api.js` were removed:** `MainApp` couldn't talk to job storage at all;
+its data-load effect would throw `JobAPI is not defined`.
 
 ---
 
-### 2.8 `src/components/kanbanBoard.jsx` — Drag & Drop Board View
+### 2.7 `src/api/mockAuth.js` — `MockAuthAPI` (NEW)
 
-**Purpose:** An alternate visualization of the same job data as `JobList`, but as a Trello-style board with one column per status, where dragging a card to a different column changes that job's status.
+**Purpose:** A fake authentication backend, entirely `localStorage`-based,
+exposing `signup`, `login`, `getCurrentUser`, and `logout`.
 
-**Note on filename:** The file is `kanbanBoard.jsx` (lowercase k) while imported in `App.jsx` as `KanbanBoard.jsx` (uppercase K). On case-insensitive filesystems (Windows, default macOS) this works fine; on case-sensitive filesystems (Linux, including most CI/CD and Vercel build containers) **this import would fail to resolve**, breaking the production build. This is a real, fixable bug worth flagging.
+**Storage keys:**
+- `mock_users` — a JSON array of *every* account ever signed up, each record
+  `{ uid, email, password, createdAt }`.
+- `current_user` — the currently-logged-in session, `{ uid, email }` (no
+  password), separate from the full user record.
 
-**Import:** `DragDropContext, Droppable, Draggable` from `@hello-pangea/dnd` — a maintained fork of the now-archived `react-beautiful-dnd` library. This library handles all the complex mouse/touch/keyboard drag physics, accessibility, and animation so the app doesn't have to implement drag-and-drop from scratch (which is notoriously fiddly to get right, especially for accessibility).
+**`initializeMockUsers()`:** Runs at the top of both `signup` and `login`.
+Checks whether `mock_users` exists yet in `localStorage`; if not, seeds it
+with one demo account (`test@example.com` / `password123`) so the app is
+usable out of the box without requiring a real signup first — this is the
+account `SignupPage.jsx`'s hint text advertises.
 
-**Constants:** `COLUMNS` (the four fixed statuses) and `COLORS` (per-status accent colors, duplicated from `Dashboard.jsx`/`Analytics.jsx` — see Weaknesses).
+**`signup(email, password)`:**
+1. Ensures the seed user exists.
+2. Rejects if a user with that email already exists (`throw new Error("User
+   already exists")`).
+3. Builds a new user record with `crypto.randomUUID()` as `uid` — the same
+   Web Crypto API used elsewhere in the app (`JobForm`'s job IDs) for
+   collision-free client-generated identifiers.
+4. **Stores the password in plain text** in `mock_users` — explicitly
+   commented in the source (`// In real app, this would be hashed!`) as a
+   known, deliberate shortcut.
+5. Immediately logs the new user in by writing `current_user`, then returns
+   `{ uid, email }` (password stripped) to the caller.
 
-**Function: `onDragEnd(result)`**
-- Called automatically by the dnd library when a drag gesture completes.
-- `if (!result.destination) return;` — guards against the user dropping a card outside any valid column (e.g., dropping it in empty space), which would make `destination` `null`.
-- Extracts `jobId` from `result.draggableId` (each `Draggable` is keyed by `job.id`) and `newStatus` from `result.destination.droppableId` (each `Droppable` column is keyed by its status name).
-- Calls `onUpdate(jobId, { status: newStatus })` — the *same* `handleUpdateJob` function from `App.jsx` used by the edit form. This means dragging a card and editing a job's status via the form are two different UIs funneling into the exact same business logic and API call — good reuse.
+**`login(email, password)`:** Looks up a user whose `email` *and* `password`
+both match exactly (`===`), throws `"Invalid email or password"` if not
+found, otherwise writes `current_user` and returns `{ uid, email }`.
 
-**Important nuance:** Unlike the edit form, dragging in the Kanban board does **not** prompt for a "status change date" — it silently lets the backend default to "today" (see `[id].js` backend logic). This is a UX inconsistency worth noting (see Engineering Assessment): the same business action (changing status) produces a less precise history entry depending on which UI path the user used.
+**`getCurrentUser()`:** A synchronous read of `current_user` — this is what
+`AuthContext`'s mount effect calls to restore a session across page
+refreshes.
 
-**Rendering structure (composition):**
+**`logout()`:** Just removes the `current_user` key. Note it does **not**
+touch `mock_users` (the account still exists) or that user's
+`user_jobs_<uid>` data (Section 2.8) — logging out never deletes anything,
+it only forgets which account is "current."
+
+**Business/security caveat worth being able to explain in an interview:**
+Storing plaintext passwords, even in a browser-only mock with no server
+component, is something you'd never do in a real product — there's no
+hashing (bcrypt/argon2), no salting, no rate-limiting on login attempts, and
+`localStorage` is trivially readable by any script running on the page
+(including a successful XSS payload). It's completely appropriate for a
+portfolio/demo project that explicitly has no real backend, but it's
+important to be able to say *why* this would never ship as-is.
+
+---
+
+### 2.8 `src/api/mockJobs.js` — `MockJobsAPI` (NEW)
+
+**Purpose:** A fake per-user job store, entirely `localStorage`-based.
+
+**Storage key pattern:** `user_jobs_<userId>` — e.g.
+`user_jobs_3f2a1c9e-...`. This is the concrete mechanism behind the
+"multi-tenancy" claim in Section 0: every read/write is namespaced by
+`userId`, so switching accounts (even within the same browser) genuinely
+switches which job list you see.
+
+**Methods — all synchronous under the hood, `async`-flavored only for
+call-site compatibility:**
+- `getJobs(userId)` — reads and `JSON.parse`s the key, or returns `[]` if
+  nothing's stored yet (first-time user).
+- `saveJobs(userId, jobs)` — `JSON.stringify`s the *entire* array and
+  overwrites the key. Every single mutation (create/update/delete)
+  round-trips the whole list through this — fine at personal-tracker scale,
+  a rewrite-amplification concern at any larger scale (same caveat the old
+  in-memory backend had, just moved to the browser).
+- `createJob(userId, job)` — assigns an `id` via `crypto.randomUUID()` only
+  if the caller didn't already supply one (`job.id ||
+  crypto.randomUUID()`), `unshift`s it onto the array (newest-first, matching
+  the old backend's behavior), saves, and returns the new record.
+- `updateJob(userId, jobId, partial)` — a plain `.map` merge
+  (`{ ...j, ...partial }` for the matching id), saves, returns the updated
+  record.
+- `deleteJob(userId, jobId)` — filters the matching id out, saves, returns
+  `true`.
+
+**What's missing compared to the old real backend
+(`api/jobs/index.js`/`[id].js`):** The old serverless backend automatically
+**seeded and appended to `statusHistory`** on create/update — that business
+rule lived entirely server-side. `MockJobsAPI.createJob`/`updateJob` do
+**not** do this; they just merge whatever fields the caller passes in
+verbatim. This means the status-history feature described in Section 6 now
+depends entirely on the *frontend* (`JobForm.jsx`'s `handleSubmit`, and
+`KanbanBoard.jsx`'s drag handler) to correctly build and pass a
+`statusHistory` array as part of the `partial`/`job` object — there's no
+server-side safety net enforcing that rule anymore. Worth double-checking
+`JobForm.jsx` still does this correctly whenever it's touched, since the
+guarantee moved from "always true, enforced centrally" to "true as long as
+every caller remembers to do it."
+
+---
+
+### 2.9 `src/theme.js` — MUI Theme Factory
+
+Unchanged from the previous revision — a pure `createAppTheme(mode)` factory
+producing a full MUI theme (palette, typography, component overrides) for
+light/dark mode. See prior documentation content; no behavioral delta.
+
+---
+
+### 2.10 `src/components/Header.jsx` — Top Bar / Toolbar (Logout added)
+
+**Purpose:** Unchanged core role — page title + action buttons (Edit,
+Delete, Export, Theme toggle, Add Job) — plus one new button.
+
+**What's new:**
+```js
+import { useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
+...
+const { logout } = useContext(AuthContext);
+const handleLogout = () => { logout(); };
+...
+<button onClick={handleLogout} style={{ ... inline styles ... }}>
+  Logout
+</button>
 ```
-DragDropContext (manages global drag state)
- └─ for each status: a column div
-     ├─ header (status name + count)
-     └─ Droppable (a column that accepts drops)
-         └─ for each job in that column: Draggable (the card)
+
+- **Placement:** Rendered as a plain, inline-styled `<button>` sitting
+  alongside the MUI `Button` components used for every other action in the
+  toolbar — a small visual/consistency inconsistency (every other button here
+  is a themed MUI `Button`; this one is raw HTML with hand-written inline
+  styles that don't respond to the dark/light theme the same way).
+- **Effect on the rest of the app:** Clicking it calls `AuthContext.logout()`
+  directly — no confirmation dialog (unlike Delete, which has one). This
+  immediately clears `current_user` and sets context `user` to `null`, which
+  flips `App.jsx`'s gate back to `SignupPage` and unmounts the entire
+  `MainApp` tree, discarding all in-memory state (`jobs`, `selectedJobId`,
+  filters, etc.) — which is fine, since it's all reloadable from
+  `localStorage` next login, but it does mean an accidental click loses your
+  place in the UI (e.g., an open edit modal) with zero warning.
+
+**Everything else in this file** (the `open`/`confirmDelete` local state, the
+`isEditing`-driven `useEffect`, `handleClose`, `PAGE_META`, props) is
+unchanged from the previous revision.
+
+---
+
+### 2.11 `src/components/JobForm.jsx` — Create/Edit Modal
+
+Unchanged in structure and behavior from the previous revision: one
+dual-mode (`open`/`setOpen` controlled-or-uncontrolled) dialog for both
+create and edit, the "status change date" conditional field, the
+`StatusTimeline` embed, `crypto.randomUUID()` for new job IDs, and
+`validateAndNormalizeUrl` gating submission.
+
+**One consequence of the backend swap worth flagging here (see 2.8):** this
+component is now the *only* place that constructs the initial
+`statusHistory: [{ status, date }]` entry for a newly created job, and the
+only place that appends a new entry when editing changes `status`. Previously
+this was enforced twice — once optimistically on the client, once
+authoritatively on the server, with the server's version always winning.
+Now there is no server-side version to fall back on or reconcile against —
+whatever `JobForm` sends is exactly what gets persisted.
+
+---
+
+### 2.12 `src/components/JobList.jsx` — Table View
+
+Unchanged from the previous revision — `STALE_DAYS = 7`, `ACTIVE_STATUSES`,
+`daysSince`/`lastActivityDate`, row selection/highlighting, the stale-badge
+logic. No auth or storage-layer changes affect this component; it only ever
+sees whatever `jobs` array `MainApp` passes it.
+
+---
+
+### 2.13 `src/components/KanbanBoard.jsx` — Drag & Drop Board View (casing bug fixed)
+
+**Purpose:** Unchanged — a Trello-style board, one column per status, using
+`@hello-pangea/dnd` for drag mechanics; dropping a card in a new column calls
+`onUpdate(jobId, { status: newStatus })`, the same `handleUpdateJob`/
+`JobAPI.update` path the edit form uses.
+
+**What changed:** The file is now correctly named `KanbanBoard.jsx`
+(capital K), matching the import in `App.jsx` (`import KanbanBoard from
+"./components/KanbanBoard.jsx"`). The previous revision of this document
+flagged a real bug here — a lowercase `kanbanBoard.jsx` file being imported
+with an uppercase path, which works by accident on case-insensitive
+filesystems (Windows/default macOS) but would break the production build on
+a case-sensitive one (most Linux CI/CD, including Vercel's build
+containers). **That bug has been fixed** — this is a good, concrete sign of
+iterative cleanup happening alongside feature work.
+
+**Still true (not fixed):** Every visual style in this file is still a JS
+object passed to inline `style={{...}}`, unlike every other component, which
+uses `.css` files — and the `COLORS` map here is still independently
+duplicated from `Dashboard.jsx`/`Analytics.jsx` rather than shared (Section
+7).
+
+**Important nuance carried over:** Dragging a card still does **not** prompt
+for a status-change date the way the edit form does — it silently records
+"today" (now via `MockJobsAPI.updateJob`'s bare merge, since there's no
+backend defaulting logic anymore either — see 2.8). Whatever date value ends
+up in the new `statusHistory` entry is whatever `KanbanBoard.jsx`'s
+`onDragEnd` constructs client-side.
+
+---
+
+### 2.14 `src/components/Dashboard.jsx` — Overview Page
+
+Unchanged from the previous revision. Still a fully stateless, derived-only
+view: `getJobStats(jobs)` for KPI numbers, a defensive `[...jobs].sort(...)`
+copy before sorting `recent`, a donut chart with a CSS-overlaid center label.
+Continues to only destructure `{ totals, successRate }` from `getJobStats` —
+it does not use any of the new fields described in 2.20, so it's unaffected
+by the stats-engine expansion.
+
+---
+
+### 2.15 `src/components/Analytics.jsx` — Trends Page (substantially expanded)
+
+**Purpose:** Still the deeper, time-based analysis page, but it now surfaces
+meaningfully more insight than before by consuming the expanded
+`getJobStats` (Section 2.20) instead of computing everything locally.
+
+**What's new:**
+```js
+const { totals, successRate, responseByRole, interviewConversionRate, bestMonth }
+  = getJobStats(jobs);
 ```
-This is **render props** — `Droppable` and `Draggable` both take a function-as-child (`{(provided) => (...)}`) instead of plain JSX children, because the library needs to inject `ref`s and drag-related props (`provided.draggableProps`, `provided.dragHandleProps`) into your markup before it knows what that markup looks like.
 
-**Inline styles:** Every visual style here is a JS object passed to `style={{...}}` rather than CSS classes (unlike every other component, which uses `.css` files). This is inconsistent with the rest of the codebase's styling approach — a maintainability smell (see Engineering Assessment), though functionally harmless.
+- **Two new KPI cards:** "Interview Conversion" (`interviewConversionRate`,
+  i.e. what fraction of jobs that reached "Interviewing" ultimately became
+  "Offer") and, conditionally (only if there's at least one job with a
+  parseable date), "Best Month" — the calendar month with the highest
+  response rate, showing that month's name, its response rate, and how many
+  applications went out that month.
+- **A brand-new third panel, "Response Rate by Role":** iterates
+  `responseByRole` (keyed by a role type auto-detected from each job's title
+  — "Frontend"/"Backend"/"Fullstack"/"DevOps"/"QA"/"Other", see 2.20) and
+  renders one row per role with its response-rate percentage. This is a
+  real, if simple, step toward the "smart insights" feature that the previous
+  revision's roadmap (Section 9, item 12) explicitly flagged as a low-impact,
+  not-yet-built idea — it's now partially built.
 
----
+**What changed under the hood (and is worth flagging as a regression):**
+- The previous revision's `getMonthlyData(jobs)` local helper computed a
+  `_sort` key (`year*12 + month`) specifically so months would render in
+  **chronological** order rather than alphabetical or insertion order. The
+  current `Analytics.jsx` builds `monthlyData` via a plain
+  `Object.values(monthMap)` with **no sort at all** — bars on the "Applications
+  by Month" chart now appear in whatever order months were first
+  encountered while looping over `jobs` (effectively the order jobs happen to
+  be stored in), not necessarily left-to-right chronological order. This is a
+  real, user-visible regression from the previous implementation and worth
+  fixing (Section 9).
+- **A naming/duplication bug:** the KPI labeled **"Response Rate"** displays
+  `successRate` from `getJobStats` — which is defined as `Offer / total`, the
+  exact same ratio the separately-computed **"Offer Rate"** KPI directly
+  below it also shows (`Math.round((totals.Offer / totals.total) * 100)`).
+  Both cards currently show identical numbers under different labels. There
+  is no card that actually shows what "response rate" conventionally means
+  in this app's own domain language (i.e., `responded / total`, where
+  `responded` = Interviewing + Offer + Rejected — the definition the
+  *previous* revision of `Analytics.jsx` used before this rewrite). This
+  looks like an unintentional regression introduced while wiring in the new
+  KPI cards, not a deliberate design choice.
 
-### 2.9 `src/components/Dashboard.jsx` — Overview Page
-
-**Purpose:** The landing page. Gives an at-a-glance summary: 4 KPI (Key Performance Indicator) cards, a "Recent Activity" list (last 5 jobs by date), and a donut chart breaking down the pipeline by status.
-
-**Imports:**
-- `getJobStats` from `utils/stats.js` — computes totals and success rate (shared logic, also used by `Analytics.jsx` and `Settings.jsx` — good reuse, single source of truth for "how do we count statuses").
-- `recharts` components (`ResponsiveContainer, PieChart, Pie, Cell, Tooltip`) — a charting library built on top of D3 and SVG, but exposing a declarative React-component API instead of raw D3 imperative code. `ResponsiveContainer` makes the chart resize with its parent automatically.
-- MUI icon imports — purely decorative, one per KPI card.
-
-**Sub-component: `KPI({ label, value, meta, icon, tone, children })`**
-- A small reusable "stat card" — not exported, used only within this file. Takes `children` so the Offer card can inject a progress bar without the `KPI` component needing to know about progress bars specifically. This is **component composition**: `KPI` provides the card chrome; the parent decides what extra content goes inside.
-
-**Main function `Dashboard({ jobs = [] })`:**
-- `const { totals, successRate } = getJobStats(jobs);` — derives all the numbers needed; no internal state at all. This entire component is **stateless and purely derived** — given the same `jobs` prop, it always renders the same output (a "pure" presentational component).
-- `active = totals.Applied + totals.Interviewing` — derived metric: jobs not yet resolved.
-- `pieData` — reshapes `totals` into the array-of-objects shape Recharts' `<Pie>` expects, filtering out zero-value slices so the chart doesn't show empty wedges.
-- `recent` — copies `jobs` (`[...jobs]` to avoid mutating the original array with `.sort`), sorts by date descending, takes the first 5.
-
-**Why copy before sorting:** `Array.prototype.sort()` mutates the array in place. If you called `jobs.sort(...)` directly, it would silently reorder the `jobs` array reference that other components/effects also depend on, causing subtle bugs elsewhere. `[...jobs].sort(...)` is the correct, defensive pattern.
-
-**Rendering:** KPI grid → two-panel grid (Recent Activity list / Donut chart). The donut's center label (`donut-center`) is an absolutely-positioned `<div>` layered over the SVG chart via CSS — a common trick since Recharts doesn't natively support "donut chart with text in the middle."
-
----
-
-### 2.10 `src/components/Analytics.jsx` — Trends Page
-
-**Purpose:** Deeper, time-based analysis: applications-per-month (stacked bar chart) and overall status breakdown (pie chart), plus 4 different KPIs than the Dashboard (Response Rate, Offer Rate instead of raw counts).
-
-**Function: `getMonthlyData(jobs)`** (local to this file, not shared)
-- Groups jobs into buckets keyed by `"Mon 'YY"` (e.g., `"Jun '26"`) using `toLocaleDateString`.
-- `if (isNaN(d)) continue;` — skips any job with an unparseable date, preventing a single bad record from crashing the chart.
-- Each bucket tracks counts per status (`Applied`, `Interviewing`, `Offer`, `Rejected`).
-- `_sort: d.getFullYear() * 12 + d.getMonth()` — a clever trick to get a single sortable integer representing "month index since year 0," used purely so months can be sorted chronologically rather than alphabetically (alphabetical would put "Apr" before "Jan", which is wrong).
-- Returns `Object.values(byMonth).sort(...)` — converts the lookup object into an ordered array for Recharts.
-
-**Derived stats specific to Analytics:**
-- `responded = Interviewing + Offer + Rejected` — anyone who got *any* reaction beyond silence.
-- `responseRate = responded / total * 100` — "how often do I hear back at all," as opposed to Dashboard's raw counts.
-- `successRate` (from shared `getJobStats`) is relabeled here as "Offer Rate."
-
-**Why duplicate `COLORS` and `KPI` instead of sharing with `Dashboard.jsx`:** Both files define their own local `COLORS` object and local `KPI` component, with slightly different values/props (`Dashboard`'s `COLORS` uses CSS variables like `"var(--st-applied)"`; `Analytics`'s `COLORS` uses literal hex codes). This is **duplicated code** — a maintainability weakness flagged later; ideally both would import from one shared `constants.js` and one shared `KPI.jsx`.
+**Still true (not fixed):** `Analytics.jsx` still defines its own local
+`KPI` component and its own local `colors` object rather than sharing either
+with `Dashboard.jsx` — the duplication flagged previously is unchanged.
 
 ---
 
-### 2.11 `src/components/Settings.jsx` — Preferences Page
+### 2.16 `src/components/Settings.jsx` — Preferences Page
 
-**Purpose:** A simple page combining a stats summary strip, a theme-toggle card, and a CSV-export card.
-
-**No local state at all** — every value (`mode`, `jobs`) is a prop; every action (`onToggleTheme`, the CSV export) is either a passed-in callback or a direct utility call. This is intentionally a thin, "dumb" presentational component.
-
-**Props:**
-| Prop | Source | Type |
-|---|---|---|
-| `mode` | `App.jsx` state | Data |
-| `onToggleTheme` | `App.toggleTheme` | Callback |
-| `jobs` | `App.jsx` state | Data |
-
-Uses `getJobStats` (shared) for the summary numbers, and calls `exportJobsToCsv(jobs)` directly on click — same utility function `Header.jsx` also uses, so there are now **two independent "Export" buttons** in the app (Header's toolbar button and this Settings page button) that both call the exact same function — intentional redundancy for discoverability, not a bug.
+Unchanged from the previous revision. Still a fully prop-driven, stateless
+page; still only destructures `{ totals, successRate }`, unaffected by the
+stats-engine expansion; still shares `exportJobsToCsv` with `Header.jsx`'s
+own Export button (intentional redundancy, not a bug).
 
 ---
 
-### 2.12 `src/components/Sidebar.jsx` — Left Navigation
+### 2.17 `src/components/Sidebar.jsx` — Left Navigation
 
-**Purpose:** The persistent left-hand navigation rail with the app brand/logo and four nav links (Dashboard, Applications, Analytics, Settings).
-
-**`NAV` constant:** An array of `{ key, label, icon }` objects — data-driven navigation. Adding a fifth page later means adding one entry to this array and one `case` in `App.jsx`'s conditional render, rather than hand-writing a fifth `<button>` JSX block. This is good practice — config-driven UI instead of repeated markup.
-
-**Props:**
-| Prop | Source | Type | Effect |
-|---|---|---|---|
-| `activePage` | `App.jsx` state | Data | Determines which nav link gets the `active` CSS class and `aria-current="page"` |
-| `setActivePage` | `App.jsx`'s `setActivePage` | Callback | Fired when a nav button is clicked — this is the **entire navigation system** of the app (no React Router) |
-
-**Architecturally important:** Sidebar doesn't own navigation state — it only *displays* it and *requests changes* to it. `App.jsx` is the sole owner. This is correct lifting-state-up since `Header` also needs to know `activePage` (for the title).
+Unchanged from the previous revision — data-driven `NAV` array, `activePage`/
+`setActivePage` props, no local state. Note it does **not** show the logged-
+in user's email or provide its own logout affordance — that lives solely in
+`Header.jsx` now (Section 2.10). If a future redesign moves navigation
+concerns around, keep in mind the Logout button currently has exactly one
+entry point.
 
 ---
 
-### 2.13 `src/components/StatusTimeline.jsx` — History Visualization
+### 2.18 `src/components/StatusTimeline.jsx` — History Visualization
 
-**Purpose:** A small vertical "stepper" UI showing the sequence of status changes a job has gone through (e.g., Applied on June 1 → Interviewing on June 10 → Offer on June 20), used inside `JobForm` when editing.
-
-**Pure presentational component** — takes one prop, `history` (array of `{ status, date }`), and renders nothing if it's empty/missing (`if (!history || history.length === 0) return null;` — a classic **guard clause** to avoid rendering broken UI for missing data).
-
-**Rendering trick:** For each entry except the last, it draws a connecting vertical line (an absolutely-positioned `<Box>`) between dots — building a timeline purely with CSS positioning rather than a charting library, since this is simple enough not to need one.
-
-**Color logic:** `STATUS_COLOR[entry.status] || "var(--primary)"` — falls back to the primary theme color if an unrecognized status ever sneaks in (defensive coding against bad/legacy data).
+Unchanged from the previous revision — a pure, presentational vertical
+stepper over a `history` prop, with a guard clause for empty/missing data and
+a `STATUS_COLOR` fallback to the theme's primary color for unrecognized
+statuses.
 
 ---
 
-### 2.14 `src/utils/validation.jsx` — URL Validator
+### 2.19 `src/utils/validation.jsx` — URL Validator
 
-**Purpose:** A pure function, `validateAndNormalizeUrl(value)`, that both validates *and* fixes up a user-typed URL.
-
-**Why `.jsx` extension despite no JSX syntax inside:** Likely a naming oversight — Vite/Babel will still transpile it fine (a `.jsx` file with no JSX is just valid JS), but it's misleading to other developers; should be renamed to `.js`. Flagged as a minor cleanliness issue.
-
-**Logic line by line:**
-1. `if (!value) return { error: "Link is required", url: "" };` — empty input is immediately rejected.
-2. Try parsing `value` directly as a URL via the built-in `URL` constructor. If the user typed a full URL like `https://company.com`, this succeeds.
-3. `if (!u.hostname.includes(".")) throw ...` — guards against technically-valid-but-useless URLs like `http://localhost` or `http://a` that have no domain dot — a job-link is presumably always a public website.
-4. If step 2 fails (e.g., user typed `company.com/careers` with no protocol), it retries by prepending `https://` and parsing again — this is the **auto-fix UX**: most users don't type `https://`, so the app quietly fixes it for them instead of just rejecting it.
-5. If *that* also fails, returns a final, user-facing error message.
-
-**Inputs:** a string (possibly empty/malformed).
-**Outputs:** `{ error: string, url: string }` — exactly one of the two is meaningful at a time (if there's an error, `url` is empty; if there's a valid `url`, `error` is empty).
-**Side effects:** none — pure function.
-**Business problem solved:** Job links pasted from various sources (browser address bar, copy-pasted from email, etc.) come in inconsistent formats; this normalizes them all into a clickable `https://...` URL and rejects garbage before it's saved.
+Unchanged from the previous revision — `validateAndNormalizeUrl(value)`
+still validates, auto-prefixes `https://` when the user omits a protocol, and
+rejects hostnames with no dot. Still misleadingly named with a `.jsx`
+extension despite containing no JSX (Section 7).
 
 ---
 
-### 2.15 `src/utils/stats.js` — Shared Statistics
+### 2.20 `src/utils/stats.js` — Shared Statistics (substantially expanded)
 
-**Purpose:** One pure function, `getJobStats(jobs)`, that all three "numbers" pages (Dashboard, Analytics, Settings) call to avoid recomputing/duplicating the same counting logic three times.
+**Purpose:** Still the one shared module that `Dashboard.jsx`, `Analytics.jsx`,
+and `Settings.jsx` all call so status-counting logic can't drift out of sync
+between pages — but it now does meaningfully more than counting.
 
-**Logic:**
-1. Initializes a `totals` object with `total` (overall count) plus a zeroed counter for each of the four statuses.
-2. Loops through `jobs` once, incrementing `totals[j.status]` — note the defensive `if (totals[j.status] != null)` guard, which silently ignores any job with a status string that isn't one of the four known ones (defensive coding against bad data, rather than crashing).
-3. Computes `successRate = Offer / total * 100`, rounded, or `0` if there are no jobs (avoiding a `NaN` from dividing by zero).
+**New helper functions (all module-private, not exported individually):**
 
-**This is the textbook example of avoiding duplicated business logic** — instead of three components each writing their own counting loop (and risking them silently drifting out of sync over time), there's one function that defines "what counts as a stat" for the whole app.
+- **`extractRoleType(title)`** — a keyword-matching classifier: lower-cases
+  the job title and checks for substrings (`"frontend"`, `"backend"`,
+  `"fullstack"`/`"full stack"`, `"devops"`, `"qa"`), falling back to
+  `"Other"` if nothing matches. This is a simple, brittle heuristic — a title
+  like `"Frontend/Backend Hybrid Engineer"` would match `"frontend"` first
+  and never be considered `"Fullstack"` even though the substring "full
+  stack" isn't present but the role clearly is; a title in a language other
+  than English, or one that just says "Software Engineer" with no
+  specialization keyword, always lands in `"Other"`.
+- **`getResponseRate(jobs, roleType)`** — filters jobs down to one role type,
+  then computes what fraction of *those* reached `Interviewing`, `Offer`, or
+  `Rejected` (i.e., "got any reaction beyond silence," the same definition
+  the old `Analytics.jsx` used for its overall response rate — see 2.15's
+  note about that definition going missing at the top-level KPI).
+- **`getInterviewConversionRate(jobs)`** — `Offer count / Interviewing count`
+  — deliberately **not** `Offer / total`; this measures "once I get an
+  interview, how often does it convert," a genuinely different and useful
+  metric from the overall offer rate.
+- **`getBestMonth(jobs)`** — buckets jobs by month (using
+  `toLocaleDateString` with `{ month: "short", year: "2-digit" }`, e.g.
+  `"Jun '26"`), computes each month's response rate the same way as
+  `getResponseRate`, and returns the single month with the highest rate (ties
+  go to whichever month was encountered first while iterating, since `>` is
+  used rather than `>=`). Returns `null` if there are no jobs at all — this is
+  exactly why `Analytics.jsx`'s "Best Month" KPI card is wrapped in
+  `{bestMonth && (...)}`.
 
----
+**`getJobStats(jobs)` (the exported default) now returns:**
+```js
+{ totals, successRate, responseByRole, interviewConversionRate, bestMonth }
+```
+— a superset of what it returned before (`totals`, `successRate` are
+unchanged in meaning and calculation). This is why `Dashboard.jsx` and
+`Settings.jsx` didn't need any changes to keep working: they simply don't
+destructure the new fields.
 
-### 2.16 `src/utils/exportCsv.js` — CSV Export
-
-**Purpose:** Converts the in-memory `jobs` array into a downloadable `.csv` file, entirely client-side (no server round-trip needed).
-
-**Line by line:**
-1. Guard: if there are no jobs, `alert()` and bail out. (Using the browser's native blocking `alert()` is a minor UX smell — a custom toast/snackbar would be less jarring — but functionally fine.)
-2. `headers` — the column titles for the CSV.
-3. `rows` — maps each job to an array of its field values in the same order as `headers`. `j.notes?.replace(/\n/g, " ")` uses optional chaining (`?.`) to safely handle jobs with no notes (`undefined`), and replaces newlines with spaces so a multi-line note doesn't break the CSV's row structure.
-4. Builds the CSV text: header row + each data row, every value wrapped in quotes (`"${v || ""}"`) so commas inside notes don't get misinterpreted as new columns, joined by `\n`.
-5. Creates a `Blob` (a binary-data-like object usable in the browser) of MIME type `text/csv`, gets a temporary `URL.createObjectURL(blob)` pointing at it.
-6. Builds an invisible `<a>` tag with `download="job-applications.csv"`, programmatically clicks it (triggering the browser's native "save file" behavior), then removes the tag and revokes the blob URL to free memory. This whole dance (`createElement` → `appendChild` → `.click()` → `removeChild` → `revokeObjectURL`) is the standard browser-only pattern for triggering a file download from JS without a server endpoint.
-
-**Side effects:** DOM manipulation, triggers a native browser download, calls `alert()`.
-
----
-
-### 2.17 `src/index.css`, `src/styles/*.css`
-
-Plain CSS files, one per component "family" (`Header.css`, `Dashboard.css` shared by Analytics too, `JobList.css`, `Job.css`, `Settings.css`, `Sidebar.css`, `App.css`). They rely on CSS custom properties (variables) like `--card-bg`, `--fg`, `--muted`, `--primary`, which are presumably defined once at the `:root` / `[data-theme]` level and swapped by the theme-sync effect in `App.jsx`. This is why `KanbanBoard` mixing in literal hex codes (`COLORS` object) instead of these CSS variables for some accents is a minor inconsistency (it does use `var(--card-bg)` for structure, but its status `COLORS` map uses raw hex instead of `var(--st-applied)` etc. like `Dashboard.jsx` does).
-
----
-
-### 2.18 Backend: `api/_lib/store.js` — Storage Abstraction
-
-**Purpose:** A single module that abstracts over *two different storage backends* so the rest of the API code doesn't need to know or care which one is active.
-
-**Why this exists — the problem it solves:** Vercel serverless functions are stateless and ephemeral — you can't just keep a JS array in memory and expect it to persist between requests (each request might hit a fresh container). The "real" solution is **Vercel KV** (a hosted Redis-compatible key-value store). But requiring KV setup before the app can even run anywhere would be a bad developer experience for local testing/demos. So this file:
-1. Checks if KV environment variables (`KV_REST_API_URL`/`KV_URL`, `KV_REST_API_TOKEN`) are present.
-2. If yes, creates a real KV client and all reads/writes go to the cloud.
-3. If no, falls back to an in-memory object on `globalThis`, **which only survives as long as that specific server process stays warm** — i.e., it's fine for a quick demo but **will silently lose all data** on a cold start/restart. This is explicitly commented in the code and is an important operational caveat to know.
-
-**Why `globalThis.__MEM_STORE__` and not a plain module-level variable:** In serverless environments, module state *can* sometimes get reset between invocations even within the same container depending on the platform's bundling; using `globalThis` is the more reliable way to ensure the same object survives across multiple function calls in one warm container.
-
-**Functions:** `getJobs`, `setJobs`, `getSettings(id)`, `setSettings(id, obj)` — straightforward read/write pairs, each checking `hasKV` to route to the correct backend.
-
----
-
-### 2.19 Backend: `api/jobs/index.js` — Collection Endpoint
-
-**Purpose:** Handles `GET /api/jobs` (list all) and `POST /api/jobs` (create one).
-
-**Function: `readJson(req)`**
-- Serverless request objects don't always come with a pre-parsed `.body`. This function handles both cases: if `req.body` is already an object (some platforms parse it for you), use it directly; otherwise, manually accumulate the raw HTTP request stream chunk by chunk (`req.on("data"...)`) and `JSON.parse` it once the stream ends. This low-level stream handling is necessary because these are raw Node.js-style HTTP handlers, not Express, which would normally do this parsing via middleware.
-
-**`POST` handler logic:**
-1. Reads/parses the JSON body.
-2. Validates it's an object (else 400).
-3. Defaults `status` to `"Applied"` and `date` to today if missing — defensive defaults so a malformed client request still results in a usable record.
-4. Builds the canonical job record server-side, including generating an `id` if the client didn't send one (`randomUUID()` from Node's built-in `crypto` module).
-5. **Initializes `statusHistory: [{ status, date }]`** — this is where status history *starts*; the client never sends this directly, the server always seeds it on creation.
-6. Fetches the current jobs list, `unshift`s (prepends) the new job, saves it back.
-7. Responds `201 Created` with the full job object (so the client's `setJobs((prev) => [created, ...prev])` gets the canonical server copy).
-
-**Method guard:** any other HTTP method gets a `405 Method Not Allowed` with an `Allow` header — correct REST API etiquette.
+**Business problem solved (the new part):** Previously, "how am I doing" was
+purely aggregate (X% success rate overall). These additions start answering
+*more specific* questions a job seeker actually cares about — "am I wasting
+time applying to DevOps roles that never respond?", "once I land an
+interview, how often do I actually get the offer?", "was there a month I
+should repeat whatever I was doing differently?" — genuinely useful, portfolio
+-worthy analytics, even though the role-classification heuristic (see above)
+is simplistic.
 
 ---
 
-### 2.20 Backend: `api/jobs/[id].js` — Single Resource Endpoint
+### 2.21 `src/utils/exportCsv.js` — CSV Export
 
-**Purpose:** Handles `PATCH /api/jobs/:id` (update) and `DELETE /api/jobs/:id` (delete). The `[id]` filename syntax is Vercel/Next.js-style **dynamic routing** — the bracketed segment becomes `req.query.id`.
-
-**`PATCH` handler — the most business-logic-dense file in the project:**
-1. Finds the existing job by id (`String(j.id) === String(id)` — coercing both sides to string defensively, in case one is a number and the other a string).
-2. 404 if not found.
-3. **Strips `statusDate` out of the incoming partial** (`const { statusDate: incomingStatusDate, ...cleanPartial } = partial;`) — `statusDate` is a *meta-instruction* ("here's the date this status change happened"), not actually a field that belongs on the job record itself, so it must not be saved as a literal `job.statusDate` field.
-4. **The core business rule:** if the incoming partial includes a `status` different from the job's current status, it appends a new entry to `statusHistory` (creating the array first if this is an old record that never had one), dated either by the client's `incomingStatusDate` (from the edit-form's "Date moved to..." field) or defaulting to today (e.g., when dragging a Kanban card, which doesn't ask for a date).
-5. Merges `existing`, `cleanPartial`, and the new `statusHistory` (if computed) into `updated`, saves it back into the array, persists, and responds `200` with the full updated record.
-
-**`DELETE` handler:** Finds the index, 404s if missing, otherwise removes it by slicing around that index (`jobs.slice(0, idx).concat(jobs.slice(idx + 1))` — a non-mutating removal, though since `jobs` here is a fresh array from `store.getJobs()` each time, mutating would have been safe too; this is just a defensively-written style), saves, responds `204 No Content` (the standard "deleted successfully, no body to return" status).
+Unchanged from the previous revision, including the previously-flagged
+correctness gap: values are wrapped in quotes (`"${v || ""}"`) but a literal
+`"` character inside a note is never escaped (e.g., doubled to `""`), so a
+note containing a quote character still produces a malformed CSV row. Not
+fixed in this revision.
 
 ---
 
-### 2.21 Backend: `api/settings/[id].js` — Theme Persistence Endpoint
+### 2.22 `src/index.css`, `src/styles/*.css`
 
-**Purpose:** `GET`/`PATCH /api/settings/:id` for reading/writing a theme preference server-side.
-
-**Important:** As noted in `api.js`'s `ThemeAPI` analysis, **this endpoint currently has no caller in the frontend** — the app persists theme via `localStorage` instead. This endpoint is fully functional but effectively dead code from the frontend's perspective. It would only matter if the team later wants theme preference to sync across devices/browsers for the same user (which would require an actual user/auth concept — currently there's only ever "settings id 1", i.e., one global theme for everyone, not per-user).
+Unchanged from the previous revision — CSS custom properties
+(`--card-bg`, `--fg`, `--muted`, `--primary`, etc.) swapped via the
+`[data-theme]` attribute set by `MainApp`'s theme-sync effect. No new
+stylesheet was added for the auth pages (`SignupPage.jsx`/`LoginPage.jsx`),
+which is why they're styled entirely with ad-hoc inline styles instead —
+they simply never got wired into this system (Section 7).
 
 ---
 
-### 2.22 `db.json`, `package.json`, `vite.config.js`
+### 2.23 Backend: `api/_lib/store.js`, `api/jobs/*.js`, `api/settings/[id].js` — Now Fully Legacy
 
-- **`db.json`** — the fake dataset for `json-server`, used only when running `npm run server` / `npm run api` locally. Lets you develop the frontend against a realistic REST API without deploying serverless functions.
-- **`vite.config.js`** — configures the dev server to proxy any request to `/api/*` over to `http://localhost:3001` (where `json-server` listens), stripping the `/api` prefix. This is *why* `API_BASE = "/api"` works seamlessly in both local dev (proxied to json-server) and production (routed directly to the real Vercel functions, which also live under `/api`) — same client code, two different backends, zero frontend changes needed.
-- **`package.json`** — Notable dependencies: `@mui/material` + `@mui/icons-material` (UI library), `@hello-pangea/dnd` (drag-and-drop), `recharts` (charts), `@vercel/kv` (production storage), `json-server` (local fake API, dev-only).
+**What these files do** is unchanged from the previous revision's detailed
+walkthrough: a KV-or-in-memory storage abstraction (`store.js`), REST
+handlers for job CRUD with server-side `statusHistory` management
+(`api/jobs/index.js`, `api/jobs/[id].js`), and a settings/theme endpoint
+(`api/settings/[id].js`).
+
+**What changed is their status, not their code:** In the previous revision,
+only `ThemeAPI`/`api/settings` were flagged as unused; `api/jobs/*` was
+still the live, actually-called backend (via `src/api.js`'s `fetch()`
+calls). **That is no longer true.** Since `src/api/api.js`'s `JobAPI` now
+delegates entirely to `MockJobsAPI` (`localStorage`), **none** of the
+`api/jobs/*` serverless functions are called by the running app anymore
+either. The entire `api/` folder, `db.json`, and the `json-server`
+dev-dependency are now fully vestigial from the frontend's point of view —
+they'd only matter if someone deployed them and pointed a *different* client
+at them directly.
+
+**If a future developer wants to move off `localStorage`-only storage:**
+this code is a legitimate, mostly-complete starting point — it already
+correctly implements the append-only `statusHistory` business rule
+server-side (something `MockJobsAPI` currently does *not* do, per Section
+2.8), has a working KV/in-memory storage abstraction, and correct REST
+semantics (404s, 405s, 201/204 status codes). Reconnecting `src/api/api.js`
+to call these endpoints instead of `MockJobsAPI` would be a much smaller
+lift than writing a real backend from scratch — see Section 9.
+
+---
+
+### 2.24 `db.json`, `package.json`, `vite.config.js`
+
+- **`db.json`** — still the seed dataset for `json-server`, still only
+  relevant if someone runs `npm run server`/`npm run api` and manually points
+  a client at `http://localhost:3001` — the live app's Vite dev server proxy
+  to `/api/*` (configured in `vite.config.js`) is never exercised anymore
+  because nothing in `src/` issues a `fetch()` to `/api/jobs`.
+- **`vite.config.js`** — unchanged; still proxies `/api/*` to
+  `http://localhost:3001`, but that proxy now has no client-side caller.
+- **`package.json`** — one new, notable dependency: **`firebase` (`^12.15.0`)
+  is listed but never imported anywhere in `src/`.** This strongly suggests
+  a real-auth migration (Firebase Auth replacing `MockAuthAPI`) was planned
+  or started and then set aside in favor of finishing the mock first — the
+  same "started the real thing, shipped the mock instead, forgot to remove
+  the leftover" pattern that produced the still-dormant `api/` backend.
+  `json-server` also remains as a devDependency, now only useful for anyone
+  who wants to manually exercise the legacy `api/jobs/*` endpoints locally.
 
 ---
 
 ## 3. Data Flow Traces (User Action → Re-render)
 
-### 3.1 Create Job
+### 3.0 Sign Up (NEW)
+
 ```
-User clicks "Add Job" (Header)
- → Header: setOpen(true) → JobForm dialog opens (jobToEdit = null → "create mode")
+User lands on the app, not logged in → App.jsx: user is null → renders <SignupPage/>
+User fills email/password, isSignup=true (toggled via the bottom link) → clicks "Sign Up"
+ → SignupPage.handleSubmit → AuthContext.signup(email, password)
+    → MockAuthAPI.signup(email, password)
+       → initializeMockUsers() seeds the demo account if this is the very first run
+       → rejects if email already exists in `mock_users`
+       → builds { uid: crypto.randomUUID(), email, password, createdAt }, appends to `mock_users`
+       → writes `current_user` = { uid, email } (password stripped)
+    → AuthContext: setUser({ uid, email })
+ → App.jsx re-renders: user is now truthy → SignupPage unmounts, <MainApp/> mounts
+ → MainApp's load effect fires ([user] dependency) → JobAPI.list(user.uid)
+    → MockJobsAPI.getJobs(user.uid) → localStorage key `user_jobs_<uid>` doesn't exist yet → []
+ → user lands on an empty Dashboard, ready to add their first job
+```
+
+### 3.0b Log In (NEW)
+
+```
+User on SignupPage with isSignup=false → fills email/password → clicks "Login"
+ → AuthContext.login(email, password) → MockAuthAPI.login(...)
+    → looks up a user in `mock_users` matching BOTH email and password exactly
+    → throws "Invalid email or password" if no match (shown inline via SignupPage's local `error` state)
+    → on match: writes `current_user`, returns { uid, email }
+ → AuthContext: setUser(...) → App.jsx swaps SignupPage for MainApp, same as signup above
+    → MainApp fetches THIS user's jobs from `user_jobs_<uid>` — a returning user sees their own data back
+```
+
+### 3.0c Log Out (NEW)
+
+```
+User clicks "Logout" (Header.jsx, no confirmation dialog)
+ → AuthContext.logout() → MockAuthAPI.logout() removes `current_user` from localStorage
+    (does NOT touch `mock_users` or that user's `user_jobs_<uid>` data — nothing is deleted)
+ → AuthContext: setUser(null)
+ → App.jsx re-renders: user is null → MainApp unmounts entirely (all its in-memory state is discarded),
+   SignupPage mounts in its place
+ → Next login (same or different account) re-fetches from localStorage fresh — no data was lost,
+   only the in-memory React state of the now-unmounted MainApp
+```
+
+### 3.1 Create Job
+
+```
+User clicks "Add Job" (Header) → Header: setOpen(true) → JobForm opens (jobToEdit = null → "create mode")
  → User fills fields → JobForm.handleChange updates local `form` state on every keystroke
  → User clicks "Save" → JobForm.handleSubmit
     → validateAndNormalizeUrl(form.link)
-    → if valid: builds `job` object with a new crypto.randomUUID()
-    → calls onCreate(job)  [prop chain: JobForm → Header → App.handleCreateJob]
-       → App.handleCreateJob: await JobAPI.create(job)  → POST /api/jobs
-          → backend: assigns canonical id/date/status, seeds statusHistory, saves, returns 201 + job
+    → if valid: builds `job` object with a new crypto.randomUUID(), including an initial statusHistory entry
+    → calls onCreate(job)  [prop chain: JobForm → Header → MainApp.handleCreateJob]
+       → MainApp.handleCreateJob: await JobAPI.create(user.uid, job)
+          → MockJobsAPI.createJob(user.uid, job): assigns an id if missing, unshifts into
+            localStorage key `user_jobs_<uid>`, saves, returns the stored record
        → setJobs(prev => [created, ...prev])
-    → React re-renders App and all children that read `jobs` (Dashboard/Analytics/Settings/JobList/KanbanBoard)
- → JobForm.closeDialog() → dialog closes, form resets to blank defaults
+    → React re-renders MainApp and all children that read `jobs` (Dashboard/Analytics/Settings/JobList/KanbanBoard)
+ → JobForm closes, form resets to blank defaults
 ```
+**Delta from the previous revision:** no network round-trip occurs at all now
+— every step above happens synchronously in the same browser tab. There is
+also no server-side reconciliation step anymore (Section 2.11) — whatever
+`JobForm` builds client-side is exactly what gets persisted, with no backend
+double-check.
 
 ### 3.2 Edit Job
+
+Same sequence as the previous revision (row select → Edit button →
+`isEditing`/`editingJob` → modal opens pre-filled → status-change-date field
+appears conditionally → Save), except the final persistence step is now:
 ```
-User clicks a row in JobList → onSelect(job.id) → App: setSelectedJobId(id)
- → Header's canEdit becomes true (re-render)
-User clicks "Edit" (Header) → App's inline onEdit handler:
-   finds job in `jobs` by selectedJobId → setEditingJob(job) → setIsEditing(true)
- → Header's useEffect([isEditing]) fires → setOpen(true) → modal opens
- → JobForm's useEffect([open, jobToEdit]) fires → form prefilled with job's data
-User edits fields, possibly changes Status dropdown
- → if status changed: a new "Date moved to X" field appears (conditional render)
-User clicks Save → JobForm.handleSubmit (edit branch)
-   → builds `partial`, includes statusDate only if status changed
-   → onUpdate(jobToEdit.id, partial) [prop chain: JobForm → Header → App's wrapped onUpdate]
-      → App: await handleUpdateJob(id, partial) → PATCH /api/jobs/:id
-         → backend appends to statusHistory if status changed, merges fields, returns updated job
-      → setJobs(prev => prev.map(j => j.id === id ? updated : j))
-      → onCancelEdit() → isEditing=false, editingJob=null
- → re-render: table/board/charts reflect the new status; modal closes
+onUpdate(jobToEdit.id, partial) → MainApp.handleUpdateJob(id, partial)
+  → await JobAPI.update(user.uid, id, partial) → MockJobsAPI.updateJob(...): plain object merge, no
+    server-side statusHistory enforcement (Section 2.8) → saves to `user_jobs_<uid>`, returns the record
+  → setJobs(prev => prev.map(j => j.id === id ? updated : j))
+  → onCancelEdit()
 ```
 
 ### 3.3 Delete Job
-```
-User selects a row → selectedJobId set (as above) → canDelete becomes true
-User clicks "Delete" (Header) → setConfirmDelete(true) → confirmation Dialog opens
-User clicks "Delete" in the dialog → App's onDelete() → handleDeleteJob(selectedJobId)
-   → await JobAPI.remove(id) → DELETE /api/jobs/:id → backend removes it, 204
-   → setJobs(prev => prev.filter(j => j.id !== id))
-   → if selectedJobId === id: setSelectedJobId(null)  (avoids dangling selection)
- → re-render: row disappears from table/board/all stat pages
-```
+
+Same sequence as before, with `JobAPI.remove(user.uid, id)` →
+`MockJobsAPI.deleteJob(user.uid, id)` filtering the job out of that user's
+localStorage array and saving — no network call, no `204` response to wait
+on (the "await" resolves essentially instantly).
 
 ### 3.4 Select Job
-```
-User clicks a JobList row → onSelect(id === selectedJobId ? null : id)
- → App: setSelectedJobId(...)
- → re-render: JobList highlights the row (selected class);
-   Header's canEdit/canDelete flip, enabling/disabling its buttons
-```
-No network call — purely a client-side UI state change.
+
+Unchanged — purely client-side UI state, no persistence layer involved at
+all (same before and after the auth/backend changes).
 
 ### 3.5 Change Status (via Edit form OR Kanban drag)
-Two different entry points converge on one function:
-```
-Path A: Edit form → handleSubmit → onUpdate(id, { status, statusDate? })
-Path B: Kanban drag-drop → onDragEnd(result) → onUpdate(jobId, { status: newStatus })  [no statusDate]
-   Both call → App.handleUpdateJob(id, partial) → PATCH /api/jobs/:id
-   → backend: status changed? append to statusHistory (dated by client's statusDate, or today if absent)
-   → setJobs(...) → re-render
-```
-**Key insight:** the Kanban path never supplies a `statusDate`, so dragged status changes are always recorded as "today," while the form lets the user backdate the change. This is a deliberate-but-inconsistent UX tradeoff (drag = fast/no-friction, form = precise/full control).
+
+Same two-entry-points-one-function shape as before (`JobForm`'s submit and
+`KanbanBoard`'s `onDragEnd` both call `handleUpdateJob`), but **the
+"authoritative statusDate defaulting" that used to live in
+`api/jobs/[id].js`'s `PATCH` handler no longer runs**, because that endpoint
+is no longer called (Section 2.23). Whatever date each caller constructs
+client-side is now final — there's no backend safety net silently defaulting
+a missing `statusDate` to "today" anymore; if a future code path forgets to
+set one, it simply won't be there.
 
 ### 3.6 Kanban Drag & Drop (full mechanics)
-```
-User starts dragging a card (mousedown on a Draggable) → @hello-pangea/dnd library takes over,
-   tracking pointer position, rendering a drag preview, animating other cards out of the way
-User drops the card on a different column (a Droppable with a different droppableId/status)
- → library calls KanbanBoard's onDragEnd(result) with { draggableId: jobId, destination: { droppableId: newStatus } }
- → guard: if dropped outside any column, result.destination is null → no-op
- → onUpdate(jobId, { status: newStatus }) → flows into App.handleUpdateJob (see 3.5)
- → re-render: columnJobs = jobs.filter(j => j.status === status) recomputes per column,
-   so the card visually "moves" because it's now counted in a different column's filter, not because
-   of any special animation logic written by this app — the library + the filtered re-render do all the work
-```
+
+Unchanged mechanically from the previous revision (`@hello-pangea/dnd`
+handles the gesture; `onDragEnd` translates a completed drop into
+`onUpdate(jobId, { status: newStatus })`); only the underlying persistence
+call has changed, per 3.5 above.
 
 ### 3.7 Theme Toggle
-```
-User clicks sun/moon icon (Header or Settings)
- → onToggleTheme() → App.toggleTheme()
-    → next = mode === "light" ? "dark" : "light"
-    → setMode(next)
-    → localStorage.setItem("theme", next)
- → re-render triggers:
-    - useEffect([mode]) sets document.documentElement[data-theme] → CSS variables flip instantly
-    - useMemo([mode]) rebuilds the MUI theme object → all MUI components re-theme
-```
-No network call. Persisted purely via `localStorage`, so it survives a page refresh (read back in `App`'s `useState` initializer: `() => localStorage.getItem("theme") ?? "dark"`).
 
-### 3.8 Search
-```
-(Currently: query state exists in App.jsx and is used in the `filtered` computation,
- but there is no visible search input wired to setQuery in the current JSX — see Section 13 Weaknesses.)
-Intended flow (once wired): user types in a search box → onChange calls setQuery(value)
- → re-render → `filtered` (computed inline in App's render, not memoized) recalculates,
-   filtering jobs whose company or title includes the query substring (case-insensitive)
- → JobList/KanbanBoard receive the new `filtered` jobs and re-render
-```
+Unchanged — still `localStorage`-only, still synced via a `useEffect` on
+`mode` that sets `document.documentElement[data-theme]`, still rebuilt via a
+`useMemo`-cached `createAppTheme(mode)`. Not affected by the auth changes.
 
-### 3.9 Filter (by status)
-```
-(Same caveat as Search — statusFilter state and its use in `filtered` exist,
- but no dropdown currently calls setStatusFilter in App.jsx's JSX.)
-Intended flow: user picks a status from a dropdown → setStatusFilter(status)
- → `filtered` re-evaluates its second .filter() step → only matching-status jobs remain
-```
+### 3.8 Search / 3.9 Filter (by status)
 
-### 3.10 Analytics Calculations
+Unchanged from the previous revision — the state and the `filtered`
+computation both still exist in `MainApp`, and there is still no visible
+input/dropdown wired to `setQuery`/`setStatusFilter` anywhere in the current
+JSX. Still an open item (Section 9).
+
+### 3.10 Analytics Calculations (expanded)
+
 ```
-App holds full `jobs` array (unfiltered) → passed as a prop directly to <Analytics jobs={jobs} />
- → Analytics calls getJobStats(jobs) [shared util] → { totals, successRate }
- → Analytics calls its own local getMonthlyData(jobs) → buckets by month, sorted chronologically
- → derived values (responseRate, pieData) computed inline on every render — no memoization,
-   but cheap enough (single pass over the array) that this is a non-issue at realistic data sizes
- → Recharts components consume these derived arrays/objects and draw SVG charts
+MainApp holds the full `jobs` array (unfiltered) → passed as a prop to <Analytics jobs={jobs} />
+ → Analytics calls getJobStats(jobs) [shared util, now expanded — see 2.20]
+   → { totals, successRate, responseByRole, interviewConversionRate, bestMonth }
+ → Analytics also still builds its own local monthlyData by looping over jobs directly
+   (no longer chronologically sorted — see 2.15's regression note)
+ → Recharts components consume these derived arrays/objects and draw the bar/pie charts;
+   the new "Response Rate by Role" panel just maps Object.entries(responseByRole) into plain divs,
+   no charting library involved
 ```
-No state, no effects — Analytics is **100% a pure derived view** of whatever `jobs` currently is in `App`.
 
 ---
 
 ## 4. Architecture Review
 
 ```
-                         ┌─────────────┐
-                         │   App.jsx   │  ← STATE OWNER for: jobs, activePage,
-                         │  (root)     │     selectedJobId, isEditing/editingJob,
-                         └─────┬───────┘     query/statusFilter/sortBy/view, mode
-                               │
-        ┌──────────┬──────────┼───────────┬────────────┐
-        ▼          ▼          ▼           ▼            ▼
+                    ┌───────────────┐
+                    │  AuthProvider │  ← STATE OWNER for: user, auth loading/error
+                    │ (main.jsx)    │     (wraps everything below)
+                    └───────┬───────┘
+                            │
+                    ┌───────▼───────┐
+                    │    App.jsx    │  ← GATE: user ? <MainApp/> : <SignupPage/>
+                    └───────┬───────┘
+              ┌─────────────┴─────────────┐
+              ▼                           ▼
+        <SignupPage/>                 <MainApp/>  ← STATE OWNER for: jobs, activePage,
+     (email/password,                     │           selectedJobId, isEditing/editingJob,
+      isSignup toggle)                    │           query/statusFilter/sortBy/view, mode
+                                           │
+        ┌──────────┬──────────┬───────────┼───────────┬────────────┐
+        ▼          ▼          ▼           ▼            ▼            
    Sidebar      Header     Dashboard   Analytics    Settings
   (activePage  (jobs,       (jobs)      (jobs)      (mode, jobs)
    nav only)    selection,
                 edit state,
-                theme)
+                theme,
+                logout)
                   │
             ┌─────┴─────┐
             ▼           ▼
@@ -796,118 +1013,317 @@ No state, no effects — Analytics is **100% a pure derived view** of whatever `
         KanbanBoard (jobs=filtered, onUpdate)
 ```
 
-- **Parent component:** `App.jsx` — the only component with `useState` for *cross-page* concerns.
-- **Child/leaf components:** `Sidebar`, `JobList`, `KanbanBoard`, `StatusTimeline`, `Dashboard`, `Analytics`, `Settings` — none of them hold app-wide state; they're consumers.
-- **Components with their own local state:** `Header` (`open`, `confirmDelete` — modal visibility, a UI-only concern scoped to itself) and `JobForm` (`form`, `linkError`, `internalOpen` — form-editing concerns scoped to itself).
-- **Shared state:** `jobs`, `activePage`, `selectedJobId`, `mode` — read by 2+ components, hence lifted to `App`.
-- **Derived state (computed, never stored):** `filtered` (in `App`), `pieData`/`recent`/`active` (in `Dashboard`), `monthlyData`/`responseRate`/`pieData` (in `Analytics`), `totals`/`successRate` (via shared `getJobStats`, used in 3 places).
-- **Prop drilling:** `onCreate`/`onUpdate` travel `App → Header → JobForm` (2 levels) — not deep enough yet to need Context, but it's the seed of prop drilling that would get worse if more nesting were added later.
+- **New top-level state owner:** `AuthProvider`/`AuthContext` — the first
+  and only Context in this codebase, sitting *above* the `App` gate rather
+  than being lifted state inside a component, precisely because the gate
+  itself needs to read it.
+- **`App.jsx`'s role changed:** it's no longer the state owner described in
+  the previous revision — it's now a thin gate, with `MainApp` (an internal,
+  unexported component in the same file) taking over that role.
+- Everything below `MainApp` is structurally identical to the previous
+  revision's diagram — no new prop-drilling was introduced by the auth work,
+  since `Header.jsx` reads `logout` directly from `AuthContext` via
+  `useContext` rather than receiving it as a prop from `MainApp`.
+- **Prop drilling vs. Context — a live comparison now visible in this
+  codebase:** `onCreate`/`onUpdate` still travel `MainApp → Header → JobForm`
+  as props (2 levels — genuine prop drilling), while `logout` travels via
+  `useContext(AuthContext)` directly inside `Header`, skipping `MainApp`
+  entirely. This is a good, concrete illustration of *when* Context earns its
+  complexity: `user`/`logout` are needed by components that aren't in a
+  direct line from a single common data-owner in the way `jobs` is, so
+  Context was the right call here, whereas `jobs` genuinely only has one
+  natural owner (`MainApp`) and doesn't need it.
 
 ---
 
 ## 5. React Concepts Used (Glossary, Grounded in This Codebase)
 
-- **`useState`** — local component memory that persists across re-renders and triggers a re-render when changed. Every state table above is an example.
-- **`useEffect`** — runs code *after* render, for things that aren't part of producing JSX: fetching data (`App`'s load effect), syncing to the DOM outside React (`data-theme` attribute), syncing a child's open/closed state to a parent prop (`Header`'s `isEditing` effect).
-- **`useMemo`** — caches an expensive computation between renders unless its dependencies change. Used once: `muiTheme` in `App.jsx`, recomputed only when `mode` changes, not on every `jobs` update.
-- **Controlled components** — form inputs whose value comes from React state and whose changes flow back through `onChange`, e.g. every `<TextField>` in `JobForm`. The alternative (uncontrolled, using refs) is not used anywhere here.
-- **Lifting state up** — `jobs`, `activePage`, `selectedJobId`, `mode` all live in `App` precisely because more than one component needs them (textbook example: `selectedJobId` is set by `JobList`'s clicks but read by `Header`'s button-disabled logic).
-- **Conditional rendering** — used everywhere: `{loading && ...}`, `{error && ...}`, `{activePage === "dashboard" && <Dashboard/>}`, `{jobToEdit && form.status !== jobToEdit.status && (...)}`.
-- **Derived state** — `filtered`, `totals`, `successRate`, `pieData`, `monthlyData` are all *computed*, never stored in their own `useState`. This is correct React practice — storing something derivable in state risks it going stale/out of sync.
-- **Prop drilling** — `onCreate`/`onUpdate`/`onEdit`/`onDelete` pass through `Header` purely to reach `JobForm` or the delete dialog; `Header` itself doesn't "use" most of them directly, it just relays them.
-- **Component composition** — `KPI`'s `children` prop (Dashboard), `Droppable`/`Draggable`'s render-props pattern (KanbanBoard), `ThemeProvider` wrapping the whole tree.
-- **Controlled vs. uncontrolled component design** — `JobForm`'s `open ?? internalOpen` dual-mode pattern, allowing it to be driven externally (by `Header`) or operate independently.
+All concepts from the previous revision still apply unchanged (see
+`useState`, `useEffect`, `useMemo`, controlled components, lifting state up,
+conditional rendering, derived state, prop drilling, component composition).
+One concept is newly exercised by this revision:
+
+- **React Context (`createContext`/`useContext`/`Provider`)** — introduced
+  for the first time via `AuthContext.jsx`. `createContext()` creates a
+  "channel"; `AuthProvider` is the component that actually puts a value onto
+  that channel (`user`, `loading`, `error`, `signup`, `login`, `logout`);
+  any descendant component can call `useContext(AuthContext)` to read that
+  value without it being passed down as a prop through every intermediate
+  component. Contrast with prop drilling (still used for `onCreate`/
+  `onUpdate` → `JobForm`): Context is the right tool specifically when many
+  *unrelated* components at different depths all need the same value (here:
+  `App.jsx` for gating, `Header.jsx` for the logout button) — using it for
+  `jobs` (which really only has one consumer tree rooted at `MainApp`) would
+  be over-engineering.
+- **Component splitting to satisfy the Rules of Hooks** — `App`/`MainApp`
+  (Section 2.2) is a concrete, real example of why you sometimes can't just
+  add an early `return` before your hooks inside one function; splitting
+  into an outer gate and an inner hook-owning component is the standard fix.
 
 ---
 
 ## 6. Business Features — How They Work Internally
 
-- **Job CRUD** — `App.jsx`'s three handlers (`handleCreateJob/Update/DeleteJob`) are the sole front door; `JobAPI` translates them to HTTP; the backend (`api/jobs/*`) is the source of truth, always returning the canonical record, which the frontend trusts completely (never assumes its own optimistic copy is correct).
-- **Status Timeline** — Born on the backend: every create seeds a one-entry `statusHistory`; every status-changing update appends an entry (dated either explicitly, via the edit form's date picker, or implicitly as "today," via Kanban drag). Displayed by `StatusTimeline.jsx`, only inside the edit form.
-- **Follow-up Reminder System** — Lives entirely in `JobList.jsx` (`STALE_DAYS`, `ACTIVE_STATUSES`, `daysSince`, `lastActivityDate`). It's a purely client-side, computed-at-render warning badge — there's no actual notification/email/push system; "reminder" here means a visual badge in the table, not a triggered notification.
-- **Analytics Dashboard** — Two flavors: `Dashboard.jsx` (today's snapshot: counts + recent items + donut) and `Analytics.jsx` (trends over time: monthly bar chart + response/offer rates). Both ultimately derive everything from the same root `jobs` array; neither stores its own copy.
-- **Search / Filtering / Sorting** — State exists and the computation (`filtered` in `App.jsx`) is correctly wired, but (as flagged) the *UI controls* (an input box, a dropdown) to actually drive `query`/`statusFilter`/`sortBy` appear to be missing from the current `App.jsx` JSX — meaning these features are implemented in logic but not currently reachable by an end user. This is worth either fixing or removing the dead state.
-- **Theme Persistence** — `localStorage`-based, synced to a `data-theme` HTML attribute that CSS responds to, and to MUI's theme object via `createAppTheme`. The backend's `ThemeAPI`/`api/settings` exists but is unused — a parallel, currently-redundant persistence mechanism.
-- **Kanban Board & Drag-and-Drop Status Changes** — `@hello-pangea/dnd` handles all drag mechanics; `KanbanBoard.jsx` only needs to (a) group jobs into columns by filtering on `status`, and (b) translate a completed drag into the same `onUpdate(id, { status })` call the edit form uses.
+- **Authentication & Per-User Data (NEW)** — `MockAuthAPI` (email+password,
+  plaintext, `localStorage`) issues a `uid`; every job read/write is scoped
+  by that `uid` via `MockJobsAPI`'s `user_jobs_<uid>` key convention. This is
+  a real multi-tenancy model, just backed by the browser instead of a
+  server — swapping in real backend auth later would mean replacing
+  `MockAuthAPI`'s internals while keeping its four-method shape
+  (`signup`/`login`/`getCurrentUser`/`logout`) intact, similar to how
+  `JobAPI`'s shape survived its own backend swap (Section 2.6).
+- **Job CRUD** — Same shape as before, but the "source of truth" is now
+  `localStorage` via `MockJobsAPI` rather than a real server; the frontend
+  no longer defers to a server-returned canonical copy for anything beyond
+  ID assignment.
+- **Status Timeline** — Same display component (`StatusTimeline.jsx`), but
+  the responsibility for *building* `statusHistory` correctly has moved
+  entirely to the frontend (`JobForm.jsx`, `KanbanBoard.jsx`) now that the
+  backend that used to own this rule is dormant (Section 2.8/2.23).
+- **Follow-up Reminder System** — Unchanged; still lives entirely in
+  `JobList.jsx`, still a computed-at-render visual badge, not a real
+  notification.
+- **Analytics** — Two flavors as before (`Dashboard.jsx` snapshot,
+  `Analytics.jsx` trends), but `Analytics.jsx` now additionally surfaces
+  role-based response rates, interview-to-offer conversion, and a
+  best-performing month — a real step toward the "smart insights" idea the
+  previous roadmap only speculated about (Section 9 revisits this).
+- **Search / Filtering / Sorting** — Unchanged, still unreachable via any
+  visible UI control (Section 3.8/3.9).
+- **Theme Persistence** — Unchanged, `localStorage`-only; `ThemeAPI`/
+  `api/settings` remain unused (now doubly so, since the endpoint it would
+  hit is no longer served by anything the app calls).
+- **Kanban Board & Drag-and-Drop Status Changes** — Unchanged mechanically;
+  filename bug fixed (Section 2.13).
 
 ---
 
 ## 7. Engineering Assessment
 
 **Strengths**
-- Clear, consistent state-ownership model — `App.jsx` correctly owns cross-cutting state; pages are mostly "dumb"/derived.
-- Good separation of concerns: `api.js` isolates networking, `utils/stats.js` centralizes business math so three pages can't drift out of sync, `validation.jsx` isolates a genuinely tricky bit of logic (URL normalization) into a testable pure function.
-- Thoughtful backend design for a "demo-able anywhere" app: the KV-or-memory fallback in `store.js` means the project runs with zero cloud setup, while still being production-capable if KV env vars are added.
-- Status history is modeled server-side as an append-only log, which is the right way to track a changing field over time (rather than just overwriting `status` and losing the past).
-- The Kanban drag-and-drop and the manual Edit form intentionally reuse the exact same `handleUpdateJob`/PATCH endpoint — no logic duplicated between two ways of doing the same business action.
-- Reasonable defensive coding throughout: `isNaN(d)` guards, `?.` optional chaining, `!= null` checks, sensible fallbacks for legacy/missing data (e.g., `JobForm`'s synthesized single-entry history for jobs created before `statusHistory` existed).
+- Clear, consistent state-ownership model preserved through the auth
+  refactor — `MainApp` still correctly owns cross-cutting state; the new
+  `App`/`MainApp` split is a textbook-correct response to a real Rules-of-
+  Hooks constraint, not an accident.
+- The `JobAPI` facade (Section 2.6) proved its value in practice: the entire
+  storage backend was swapped from real HTTP calls to `localStorage` without
+  a single change needed in any component that calls `JobAPI` — this is
+  exactly the payoff the adapter pattern promises, actually realized here,
+  not just theoretical.
+- Real, working multi-user data isolation (`user_jobs_<uid>`), implemented
+  without being asked to scale to "real" multi-tenancy — a sign of thinking
+  about data ownership correctly even in a mock.
+- The `kanbanBoard.jsx`/`KanbanBoard.jsx` casing bug flagged in the previous
+  review has actually been fixed — concrete evidence that previous feedback
+  (or independent code review) gets acted on.
+- The analytics expansion (`stats.js`) adds genuinely useful, non-trivial
+  derived metrics (interview conversion, best month, per-role response rate)
+  without touching the two consumers (`Dashboard.jsx`, `Settings.jsx`) that
+  didn't need the new fields — an example of extending a shared function
+  additively rather than breaking its existing contract.
 
 **Weaknesses**
-- **Search/Filter UI is wired in state but not in the visible JSX** — dead-looking functionality from a user's perspective; either finish wiring it or remove the unused state to reduce confusion.
-- **Filename casing bug:** `kanbanBoard.jsx` vs. the `KanbanBoard.jsx` import in `App.jsx` — works on Windows/macOS, **will break the build on case-sensitive filesystems** (most Linux CI/CD, including Vercel's build containers, depending on configuration). This should be fixed immediately.
-- **Duplicated constants/components:** `COLORS` maps and local `KPI` components are independently redefined in `Dashboard.jsx`, `Analytics.jsx`, and (a status-color variant of) `KanbanBoard.jsx`/`StatusTimeline.jsx`/`JobList.jsx` (the CSS `status-pill` classes). A shared `constants/statusColors.js` and a shared `<KPI/>` component would remove this risk of values silently diverging.
-- **Dead code:** `ThemeAPI` in `api.js` and the entire `api/settings/[id].js` endpoint are unused by the frontend (theme persists via `localStorage` only). Either wire it up for cross-device sync or remove it.
-- **Unused import:** `SearchIcon` in `App.jsx`.
-- **No memoization of `filtered` in `App.jsx`** — recomputed on every render of `App`, including renders triggered by unrelated state (e.g., toggling the modal). At current scale (a personal job tracker, dozens-to-low-hundreds of rows) this is a non-issue, but it's the kind of thing that should be wrapped in `useMemo` once data volume grows.
-- **In-memory storage fallback is a silent data-loss trap.** If a team deploys to Vercel without setting up KV env vars, the app will *appear* to work perfectly in testing, then lose all data on the next cold start, with no warning to the user. This should at minimum log a loud server-side warning, and ideally the frontend should detect/display a "non-persistent storage" banner.
-- **No request-level validation on the backend** beyond defaults — e.g., `POST /api/jobs` doesn't reject a job with no `company`/`title`, it just stores empty strings. Validation logic that exists client-side (`JobForm`'s `required` attributes) isn't mirrored server-side, so a non-browser client (or buggy future code) could write garbage records.
-- **Single global settings record (`id=1`)** — there's no concept of "users," so theme settings (if ever wired up) and all jobs are global to whoever has access to the deployment. Fine for a personal tool; would need a real auth/user model before this could be multi-tenant.
-- **Inline styles in `KanbanBoard.jsx`** are inconsistent with every other component's CSS-file approach — harder to theme/maintain than the rest of the app.
-- **CSV export uses a blocking native `alert()`** for the empty-state case — minor UX inconsistency vs. the rest of the app's styled UI.
+- **Mock auth stores plaintext passwords in `localStorage`.** Explicitly
+  self-flagged in a code comment (`// In real app, this would be hashed!`),
+  so this is a known, deliberate shortcut rather than an oversight — but it's
+  worth being able to explain clearly why it's disqualifying for any real
+  deployment (no hashing/salting, no rate limiting, `localStorage` readable
+  by any script on the page).
+- **`LoginPage.jsx` is dead code.** It's a fully-built, never-imported
+  component; `SignupPage.jsx` independently implements the same login flow
+  internally via a toggle. Should be deleted, or the app should be refactored
+  to actually route to it.
+- **The entire top-level `api/` backend, plus `db.json` and the
+  `json-server` devDependency, are now fully dormant** — not partially, as
+  in the previous revision (which still had a live `api/jobs/*`). Nothing in
+  `src/` calls any of it anymore. This is a bigger version of the same
+  "evolved past it, never deleted it" pattern flagged before — now covering
+  an entire backend, not just one endpoint.
+- **An unused `firebase` dependency sits in `package.json`.** Never imported
+  anywhere. Strongly suggestive of an abandoned real-auth migration attempt,
+  another instance of the same pattern.
+- **Analytics.jsx's monthly chart lost its chronological sort** in the
+  rewrite that added the new KPI cards (Section 2.15) — bars can now render
+  out of calendar order. This reads as an accidental regression, not a
+  deliberate change.
+- **A real, user-visible metric bug:** Analytics' "Response Rate" and "Offer
+  Rate" KPI cards currently show the *same number* under two different
+  labels (Section 2.15), while the app's own `getResponseRate`/
+  `responseByRole` logic elsewhere clearly treats "response rate" as a
+  different, broader calculation (`responded / total`, where responded
+  includes Rejected). This should be fixed — either card should be corrected
+  or renamed.
+- **Search/Filter UI is still wired in state but not in the visible JSX** —
+  unchanged from the previous revision; still worth finishing or removing.
+- **No server-side validation exists anywhere anymore** (there's no server),
+  and there's also no client-side "sanity" layer beyond `JobForm`'s HTML
+  `required` attributes — since `MockJobsAPI` does a bare object merge with
+  no shape-checking, any code path that calls `JobAPI.create`/`update`
+  directly (bypassing `JobForm`) could write malformed records with nothing
+  to stop it.
+- **Logout has no confirmation**, unlike Delete — an accidental click
+  instantly discards the current in-memory UI state (open modals, unsaved
+  filter selections) with no warning, even though no actual data is lost.
+- **Styling inconsistency widened, not narrowed:** the new auth pages
+  (`SignupPage.jsx`, `LoginPage.jsx`) and the new Logout button
+  (`Header.jsx`) are all inline-styled, adding to the pre-existing
+  inconsistency around `KanbanBoard.jsx`'s inline styles versus every other
+  component's `.css` file convention.
+- **Carried over, still true:** duplicated `COLORS`/`KPI` definitions across
+  `Dashboard.jsx`/`Analytics.jsx`/`KanbanBoard.jsx`; `.jsx` extension on the
+  non-JSX `validation.jsx`; CSV export's unescaped-quote bug; blocking
+  native `alert()` in `exportCsv.js`.
 
 **Scalability concerns**
-- Whole-array refetch/recompute model: every render recomputes `filtered`/stats over the *entire* `jobs` array. Fine up to perhaps a few thousand rows; would need pagination, server-side filtering, or virtualization (e.g., for `JobList`'s table) well before real scale.
-- The in-memory store keeps the *entire* dataset as one JSON blob (`kv.set("jobs", jobs)` writes the whole array every time). At larger scale this becomes a write-amplification problem — every single edit rewrites every job's data.
-- No pagination on `GET /api/jobs` — the entire history is sent on every page load.
 
-**Code quality review**
-- Generally readable, decently named identifiers, sensible single-purpose functions. Comments are sparse but the code is mostly self-explanatory; where comments exist (`store.js`), they explain genuinely non-obvious reasoning (why `globalThis`, why KV is conditionally initialized) — exactly where comments should be used.
-- Minor inconsistencies (inline styles vs CSS files, `.jsx` extension on a non-JSX util file, duplicated `COLORS`) suggest iterative, fast-moving development without a final cleanup pass — typical of a real-world project built feature-by-feature rather than a flaw of understanding.
+Largely unchanged from the previous revision, but now entirely a
+browser-storage concern rather than a server one: `MockJobsAPI.saveJobs`
+rewrites a user's *entire* job array to `localStorage` on every single
+mutation (write-amplification, same shape of problem the old in-memory
+backend had, just relocated), and `localStorage` itself has a hard per-origin
+size ceiling (typically ~5–10MB depending on browser) that a very active
+user could theoretically approach given enough jobs, notes, and status
+history over years of use — something a real backend would never risk.
 
-**Maintainability review**
-- Single-owner state model in `App.jsx` makes the data flow easy to trace (a real strength for onboarding new developers — as evidenced by this very document being traceable end-to-end).
-- The biggest maintainability risk is **duplicated business constants** (status colors, KPI card markup) — a future status addition (e.g., "Withdrawn") would require updating `STATUSES` in `JobForm`, plus `COLORS` in 2-3 places, plus CSS `status-pill` classes, plus `ACTIVE_STATUSES`/stale logic in `JobList`, with no single place that enforces all of these stay in sync.
+**Code quality / maintainability review**
+
+The core pattern from the previous revision holds: generally readable,
+sensibly named, mostly self-explanatory, with comments appearing exactly
+where the reasoning is genuinely non-obvious (`mockAuth.js`'s
+plaintext-password comment is a good example of this). The auth/analytics
+additions are consistent with the same "moving fast on feature work without
+a final consolidation pass" pattern already identified — evidenced concretely
+by two now-orphaned subsystems (`LoginPage.jsx`, the entire `api/` backend)
+and one unused dependency (`firebase`) accumulating in a single revision's
+worth of changes.
 
 **UI/UX review**
-- Clean, modern dashboard aesthetic (MUI + custom CSS variables, dark/light theming, KPI cards, charts) — looks professional for a portfolio piece.
-- The stale-application badge in `JobList` is a genuinely thoughtful, real-world-useful feature (most job trackers don't proactively flag silence).
-- Missing/unreachable search & filter controls are the most visible UX gap relative to what the code implies should exist.
-- The Kanban drag path silently defaulting the status-change date to "today" (vs. the form's explicit date picker) is a subtle data-quality inconsistency a user might not notice.
+
+The stale-application badge and the new role/time-based analytics insights
+continue to be genuinely thoughtful, real-world-useful features. The new
+weak spots are the unstyled auth screens (visually jarring compared to the
+polished MUI-based rest of the app) and the two Analytics KPI cards silently
+showing duplicate numbers under different names — a user comparing "Response
+Rate" against "Offer Rate" would reasonably expect two different numbers and
+might draw a wrong conclusion from seeing them match.
 
 **Architecture review**
-- Sound for the app's current size: one root state owner, mostly-pure leaf components, a thin API layer, and a backend with a sensible storage abstraction. No React Router (acceptable, since there are only 4 "pages" controlled by simple string state — adding a router would be premature here, not a deficiency). No global state library (Redux/Zustand) — also appropriate; `useState` + lifting state up is the right level of complexity for this app's actual scope. The architecture would need to evolve (Context or a state library, pagination, real auth) only if the feature set grows significantly (multi-user, much larger datasets, more deeply nested UI).
+
+Still sound for the app's size, and the auth addition was integrated cleanly
+via the correct tool (Context) without disturbing the existing state-
+ownership model. The most important architectural fact to carry forward is
+that **this app currently has zero server dependency at runtime** — it is a
+fully client-side, `localStorage`-backed SPA wearing the API-shaped
+interfaces of a real client/server app. That's a deliberate and reasonable
+choice for a personal, single-browser tool and for a portfolio demo, but it
+means "your data" is really "this browser profile's data" — clearing browser
+storage, or opening the app in a different browser/device, means starting
+over with no jobs and no accounts, since none of it lives anywhere but that
+one browser.
 
 ---
 
 ## 8. Skill Assessment
 
-Based on this codebase alone, the developer demonstrates skills consistent with **Strong Junior, trending toward Mid-Level.**
+Based on this codebase, the developer continues to demonstrate skills
+consistent with **Strong Junior, trending toward Mid-Level**, with this
+revision adding evidence on both sides of that assessment.
 
-**Reasoning:**
-- Correctly applies foundational patterns without being told to: lifting state up, derived vs. stored state, controlled components, pure presentational components, guard clauses, and defensive handling of legacy/missing data — these are *not* given for free; many junior developers store things in state that should be derived, or mutate arrays in place (notice the deliberate `[...jobs].sort()` in `Dashboard.jsx` — a junior mistake avoided).
-- Designed a real, non-trivial backend feature (append-only `statusHistory`) that requires reasoning about *when* to mutate vs. append, and handling backward compatibility for records that predate the feature (`JobForm`'s synthesized single-entry history fallback) — this kind of forward-thinking compatibility handling is typically a mid-level instinct.
-- Built a storage abstraction (`store.js`) that gracefully degrades from a managed cloud service to an in-memory fallback, with an awareness of *why* (cold starts, container reuse via `globalThis`) — shows real understanding of the serverless execution model, not just "it works on my machine."
-- Reused the same backend mutation path (`handleUpdateJob`) across two very different UIs (form + drag-and-drop) instead of writing two separate, diverging code paths — a sign of thinking in terms of *business actions* rather than *UI components*.
-- The weaknesses present (filename casing bug, dead code, duplicated constants, unwired search/filter state) are consistent with **moving fast on feature work without a final consolidation/cleanup pass** — a common and very fixable pattern at this level, not a sign of not understanding the concepts. A senior engineer would have caught the casing bug and duplication in review, but writing the feature work itself already shows solid command of React fundamentals and reasonable backend system design.
+**New evidence supporting the "trending mid-level" read:**
+- Correctly reached for React Context specifically when prop drilling
+  stopped being the right tool (`user`/`logout` needed by components with no
+  direct parent/child relationship), rather than either over-using Context
+  everywhere or forcing everything through props regardless of fit.
+- Recognized and correctly solved a real Rules-of-Hooks constraint by
+  splitting `App`/`MainApp` — many developers at this level would instead
+  reach for a hacky early-return-before-hooks pattern that works until it
+  doesn't (e.g., the moment a second piece of state needs a hook above the
+  gate).
+- Kept the `JobAPI` facade's public shape stable while completely swapping
+  its implementation (real HTTP → `localStorage`) — demonstrates
+  understanding *why* that abstraction layer existed in the first place, not
+  just that it happened to be there.
+- Extended `getJobStats` additively (new return fields, no breaking changes
+  to existing consumers) rather than rewriting it in a way that would have
+  forced updates to `Dashboard.jsx` and `Settings.jsx` too.
+- Self-documented a known security shortcut in code (`mockAuth.js`'s
+  plaintext-password comment) rather than leaving it silently wrong — shows
+  awareness of the gap even without fixing it yet.
+
+**Evidence still consistent with "not yet senior":**
+- The pattern of abandoning a subsystem mid-migration without deleting it
+  repeated at least twice in this revision alone (`LoginPage.jsx`, the
+  unused `firebase` dependency) on top of the pre-existing dormant `api/`
+  backend — a senior engineer in code review would likely have caught and
+  removed at least one of these before merging.
+- The Analytics "Response Rate"/"Offer Rate" duplicate-number bug (Section
+  7) suggests the new KPI cards were added without checking the resulting
+  UI against the existing cards for redundancy — a quick manual QA pass
+  comparing the two numbers side by side would have caught this immediately.
+- The lost chronological sort in the monthly chart is the kind of thing that
+  slips through when a rewrite focuses on adding a new feature and doesn't
+  re-verify behavior the previous version of the same function used to
+  guarantee.
 
 ---
 
 ## 9. Improvement Roadmap
 
 **High Impact**
-1. **Fix the `kanbanBoard.jsx`/`KanbanBoard.jsx` casing mismatch** — this is a ticking time bomb that could break a production deploy on a case-sensitive build environment. Trivial fix, outsized risk.
-2. **Wire up (or remove) Search and Status Filter UI** — the logic already exists; either add the missing input/dropdown controls in `App.jsx`'s Applications page, or delete the dead `query`/`statusFilter`/`sortBy` state to avoid confusing future maintainers.
-3. **Server-side validation** on `POST`/`PATCH /api/jobs` (reject missing `company`/`title`, validate `status` is one of the known values) — currently the only validation is client-side and easily bypassed.
-4. **Authentication / multi-user backend** — right now there's no concept of "whose jobs are these." Before this could be shared with real users (rather than a single personal deployment), basic auth (even a simple email/passwordless magic link) plus scoping all `jobs`/`settings` by user id is a prerequisite for almost every other "real product" feature.
+1. **Fix the Analytics "Response Rate" / "Offer Rate" duplicate-metric bug**
+   (Section 7) — decide what each card is actually supposed to show
+   (`responded/total` vs `Offer/total`) and make sure they show different,
+   correctly-labeled numbers.
+2. **Restore chronological ordering to the "Applications by Month" chart** in
+   `Analytics.jsx` — reintroduce a sort key (e.g., the previous `_sort =
+   year*12 + month` trick) before rendering `monthlyData`.
+3. **Decide the fate of the dormant `api/` backend, `db.json`, and
+   `json-server`.** Either (a) delete them, since the app is now fully
+   `localStorage`-based and they add pure cognitive overhead with zero
+   runtime benefit, or (b) deliberately resurrect them as the real
+   persistence layer (pointing `src/api/api.js`'s `JobAPI` at real `fetch()`
+   calls again) if moving beyond single-browser storage is actually a goal —
+   the backend already correctly implements the `statusHistory` business
+   rule server-side, which would be a real win to get back (Section 2.8).
+4. **Replace mock auth with real auth** before this could ever be used by
+   more than one person on a trusted device — the already-installed but
+   unused `firebase` dependency suggests this was already being considered;
+   Firebase Auth (or any real hashed-password/OAuth provider) would remove
+   the plaintext-password problem entirely and pair naturally with
+   resurrecting the real backend from item 3.
+5. **Delete `src/pages/LoginPage.jsx`** (or actually wire it up via a router)
+   — it's dead code that will confuse the next person who edits it expecting
+   an effect.
 
 **Medium Impact**
-5. **Deduplicate status colors/KPI components** into shared `constants/statusColors.js` and a shared `<KPI/>` component imported by `Dashboard.jsx`, `Analytics.jsx`, and `KanbanBoard.jsx` — reduces the risk of colors silently diverging when a new status is added.
-6. **Testing** — there are currently no automated tests anywhere in the project. Start with pure-function unit tests (`utils/stats.js`, `utils/validation.jsx`, `utils/exportCsv.js` are all trivially unit-testable with no mocking needed) before attempting component or integration tests.
-7. **React Router** — not urgent at 4 pages, but if the app grows (e.g., a dedicated "job detail" page, deep-linkable URLs for sharing a specific application), introducing `react-router-dom` would replace the current `activePage` string-based pseudo-router with real, bookmarkable URLs.
-8. **Activity feed** — a natural extension of the already-existing `statusHistory` data: a single chronological feed across *all* jobs (not just one job's timeline) showing "Moved Acme Corp to Interviewing — 2 days ago" would reuse existing data with no backend schema changes.
-9. **Notifications** — turning the existing client-side-only "stale" badge (`JobList.jsx`) into an actual proactive notification (browser push, or a daily digest email) would meaningfully increase the app's real-world usefulness — but requires a backend job scheduler and (per #4) a real user/email model first.
+6. **Wire up (or remove) Search and Status Filter UI** — unchanged from the
+   previous revision's recommendation; still not done.
+7. **Deduplicate status colors/KPI components** into a shared
+   `constants/statusColors.js` and a shared `<KPI/>` — unchanged
+   recommendation, now spanning three independent copies (`Dashboard.jsx`,
+   `Analytics.jsx`, `KanbanBoard.jsx`).
+8. **Add a confirmation step to Logout**, matching the existing Delete
+   confirmation pattern, so an accidental click doesn't discard in-progress
+   UI state with no warning.
+9. **Testing** — still zero automated tests anywhere. `utils/stats.js` is
+   now a much stronger first candidate than before, given the new
+   `extractRoleType`/`getResponseRate`/`getBestMonth` logic has several edge
+   cases (empty jobs array, unparseable dates, tie-breaking in "best month")
+   that are exactly the kind of thing unit tests catch cheaply.
+10. **React Router** — same recommendation as before; would also let
+    `LoginPage.jsx` (item 5) become a real, separately-linkable route instead
+    of dead code or a toggle.
 
 **Low Impact**
-10. **TypeScript** — would catch a class of bugs (e.g., a typo'd status string, an unexpected `undefined` field) for relatively low effort given the codebase is already organized into small, well-scoped files — but it's a "nice to have" polish item, not a functional gap, for a project of this size.
-11. **File attachments** (resume/cover letter per application) — a genuinely useful feature for a job tracker, but it's the most infrastructure-heavy item on this list (needs file storage like Vercel Blob/S3, upload UI, size/type validation) relative to its impact on the *core* tracking workflow — appropriately low priority until the higher-impact items are settled.
-12. **Smart insights** ("companies that respond fastest," "best day of week to apply") — fun and impressive in a demo, but depends on having enough real data volume to be statistically meaningful, and depends on the higher-impact multi-user/auth work existing first if this is meant to generalize beyond one person's own data.
+11. **Style the auth pages consistently** with the rest of the app's CSS-
+    variable-based theming, instead of the current ad-hoc inline styles that
+    don't respond to dark/light mode the way the rest of the UI does.
+12. **TypeScript** — unchanged recommendation from the previous revision.
+13. **File attachments**, **Smart insights** — the "smart insights" item
+    from the previous revision's roadmap is now partially realized
+    (role-based response rate, best month, interview conversion); remaining
+    low-impact ideas in this space (e.g., "best day of week to apply") are
+    still gated on having enough real data volume to be meaningful.
+14. **Activity feed / Notifications** — unchanged recommendations from the
+    previous revision; both remain natural extensions of the existing
+    `statusHistory` data model.
