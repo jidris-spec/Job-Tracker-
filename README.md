@@ -102,7 +102,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and sign up with any email/password — this creates a real user in your Supabase project.
+Open https://job-tracker-gilt-nine.vercel.app/ and sign up with any email/password — this creates a real user in your Supabase project.
 
 ---
 
