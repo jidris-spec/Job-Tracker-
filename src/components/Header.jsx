@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useContext } from "react";
 import "../styles/Header.css";
-import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import JobForm from "./JobForm";
 import exportJobsToCsv from "../utils/exportCsv";

@@ -22,6 +22,7 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
+    "@supabase/supabase-js": "^2.110.7",
     "@vercel/kv": "^1.0.0",
     "firebase": "^12.15.0",
     "react": "18.3.1",

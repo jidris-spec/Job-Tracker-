@@ -14,7 +14,7 @@ Live: https://job-tracker-gilt-nine.vercel.app/
 - Kanban board with drag-and-drop status changes
 - Application timeline: every status change is recorded with a date and shown as a visual history in the edit form
 - Stale-application badges in the table view (flags active applications with no status change in 7+ days)
-- Dashboard charts (Recharts) and Analytics page (monthly trends, response/offer rate) to visualize your progress
+- Dashboard charts (Recharts) and an Analytics page with monthly trends, offer rate, interview-to-offer conversion rate, best-performing month, and response rate broken down by role type (Frontend/Backend/Fullstack/DevOps/QA/Other, inferred from job title)
 - CSV export of your job list
 - Light/Dark theme, persisted via `localStorage`
 
@@ -39,8 +39,8 @@ src/
   context/
     AuthContext.jsx      # React context exposing { user, signup, login, logout }
   pages/
-    LoginPage.jsx
-    SignupPage.jsx
+    LoginPage.jsx        # built but currently unused — SignupPage.jsx handles login too, via a toggle
+    SignupPage.jsx        # the actual logged-out screen; handles both signup and login
   components/
     Header.jsx
     Sidebar.jsx
@@ -52,7 +52,7 @@ src/
     Analytics.jsx
     Settings.jsx
   utils/
-    stats.js
+    stats.js             # totals, success rate, plus role-based response rate / interview conversion / best month
     validation.jsx
     exportCsv.js
   styles/

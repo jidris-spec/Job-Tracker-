@@ -1,0 +1,111 @@
+.job-details-panel {
+  width: 300px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+.job-details-empty {
+  width: 300px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: var(--fg-secondary);
+}
+
+.details-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: var(--fg);
+}
+
+.job-title {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fg-secondary);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.detail-row .label {
+  font-weight: bold;
+  color: var(--fg-secondary);
+}
+
+.detail-row .job-link {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.detail-row .job-link:hover {
+  text-decoration: underline;
+}
+
+.notes-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fg);
+  line-height: 1.5;
+}
+
+.attachments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--primary);
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.attachment-item:hover {
+  background: var(--card-border);
+}
+
+.status-pill {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.status-pill.Applied {
+  background: #3b82f6;
+  color: white;
+}
+
+.status-pill.Interviewing {
+  background: #f59e0b;
+  color: white;
+}
+
+.status-pill.Offer {
+  background: #10b981;
+  color: white;
+}
+
+.status-pill.Rejected {
+  background: #ef4444;
+  color: white;
+}

@@ -1,7 +1,7 @@
 import { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 
-export function LoginPage() {
+export function LoginPage({ onSwitchToSignup }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -73,6 +73,23 @@ export function LoginPage() {
         >
           Demo account: <strong>test@example.com</strong> | Password:{" "}
           <strong>password123</strong>
+        </p>
+
+        <p style={{ marginTop: 15, textAlign: "center" }}>
+          Don't have an account?{" "}
+          <button
+            type="button"
+            onClick={onSwitchToSignup}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#3b82f6",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            Sign Up
+          </button>
         </p>
       </form>
     </div>

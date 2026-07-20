@@ -12,14 +12,21 @@ import Sidebar from "./components/Sidebar";
 import { AuthContext } from './context/AuthContext';
 import { JobAPI } from "./api/api.js";
 import { SignupPage } from './pages/SignupPage';
+import { LoginPage } from './pages/LoginPage';
+import JobDetails from './components/JobDetails';
 
 export default function App() {
   // CHECK IF USER IS LOGGED IN FIRST
   const { user } = useContext(AuthContext);
+  const [authMode, setAuthMode] = useState("login"); // default to login
 
-  // If NOT logged in, show login page only
+  // If NOT logged in, show login or signup page
   if (!user) {
-  return <SignupPage />;
+    return authMode === "login" ? (
+      <LoginPage onSwitchToSignup={() => setAuthMode("signup")} />
+    ) : (
+      <SignupPage onSwitchToLogin={() => setAuthMode("login")} />
+    );
   }
 
   // If logged in, show the rest of the app
@@ -28,7 +35,7 @@ export default function App() {
 
 // All your app logic in a separate component
 function MainApp() {
-    const { user } = useContext(AuthContext);  
+  const { user } = useContext(AuthContext);  
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,7 +63,7 @@ function MainApp() {
   (async () => {
     try {
       setLoading(true);
-      const data = await JobAPI.list(user.uid);  // ← Pass user.uid
+      const data = await JobAPI.list(user.id);  // ← Pass user.id
       setJobs(data);
     } catch (e) {
       setError(e.message || "Failed to load");
@@ -68,13 +75,13 @@ function MainApp() {
 
   // CREATE
   const handleCreateJob = async (job) => {
-    const created = await JobAPI.create(user.uid, job);
+    const created = await JobAPI.create(user.id, job);
     setJobs((prev) => [created, ...prev]);
   };
 
   // UPDATE
   const handleUpdateJob = async (id, partial) => {
-    const updated = await JobAPI.update(user.uid, id, partial);
+    const updated = await JobAPI.update(user.id, id, partial);
     setJobs((prev) =>
       prev.map((j) => (j.id === id ? updated : j))
     );
@@ -82,7 +89,7 @@ function MainApp() {
 
   // DELETE
   const handleDeleteJob = async (id) => {
-    await JobAPI.remove(user.uid,id);
+    await JobAPI.remove(user.id, id);
     setJobs((prev) =>
       prev.filter((j) => j.id !== id)
     );
@@ -211,20 +218,31 @@ function MainApp() {
                       </div>
                     </div>
 
-                    <main>
-                      {view === "table" ? (
-                        <JobList
-                          jobs={filtered}
-                          selectedJobId={selectedJobId}
-                          onSelect={setSelectedJobId}
-                        />
-                      ) : (
-                        <KanbanBoard
-                          jobs={filtered}
-                          onUpdate={handleUpdateJob}
-                        />
-                      )}
-                    </main>
+                    <main style={{ display: "flex", gap: "16px" }}>
+                            {view === "table" ? (
+                              <div style={{ flex: 1 }}>
+                                <JobList
+                                  jobs={filtered}
+                                  selectedJobId={selectedJobId}
+                                  onSelect={setSelectedJobId}
+                                />
+                              </div>
+                            ) : (
+                              <KanbanBoard
+                                jobs={filtered}
+                                onUpdate={handleUpdateJob}
+                              />
+                            )}
+                            
+                            {/* NEW: Job Details Panel */}
+                            {view === "table" && selectedJobId && (
+                              <JobDetails
+                                job={filtered.find(j => j.id === selectedJobId)}
+                                onEdit={() => {/* will add this later */}}
+                                onDelete={() => {/* will add this later */}}
+                              />
+                            )}
+                          </main>
                   </>
                 )}
 

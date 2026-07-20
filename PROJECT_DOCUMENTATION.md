@@ -3,11 +3,21 @@
 > Written for a developer joining the team who is still learning React.
 > Every section explains things in plain English first, then in technical terms.
 >
-> **Updated:** this revision reflects the addition of a mocked authentication
-> system (signup/login/logout, per-user data namespacing) and an expanded
-> analytics engine (role-based response rates, interview conversion, best
-> month). The previous revision described a real fetch-based backend as the
-> live data layer — that is no longer accurate; see Section 0 and Section 4.
+> **Updated (Revision 3):** this revision reflects a migration from the
+> mocked, `localStorage`-only auth/data layer described in Revision 2 to a
+> **real Supabase backend** — real hosted Postgres for job data, real
+> Supabase Auth (hashed passwords, sessions, `onAuthStateChange`) for
+> accounts. `MockAuthAPI`/`MockJobsAPI` are no longer called by anything.
+> **As of this writing, this migration exists only in the working tree — it
+> has not been committed.** See the new Section 0.1 for a full delta, and
+> Section 10 for a point-by-point reconciliation against an external
+> code-review-style critique this revision was written in response to.
+>
+> Revision 2's note remains accurate as history: it described the move from
+> a real-but-abandoned Vercel/KV backend to a `localStorage` mock. This
+> revision is the next step in that same story — from mock back to a real
+> backend, just a different (and arguably better-suited) one than the
+> original.
 
 ---
 
@@ -17,30 +27,102 @@ Think of this app like a personal CRM for your job hunt. Instead of tracking
 customers, you track job applications: who you applied to, what stage you're
 at (Applied → Interviewing → Offer/Rejected), and notes about each one.
 
-It now has **three** conceptual layers, only two of which are actually live:
+It now has **three** conceptual layers, and — for the first time since
+Revision 1 — **two of them are genuinely live at once**:
 
 1. **Frontend UI** (`src/components`, `src/pages`) — what the user sees and
-   clicks.
-2. **Frontend "backend"** (`src/api`, `src/context`) — a client-side-only data
-   layer. Auth and job data both live in `localStorage`, wrapped behind small
-   API-shaped modules (`MockAuthAPI`, `MockJobsAPI`) so the rest of the app
-   *feels* like it's talking to a server, but no network request is ever made
-   for jobs or authentication.
-3. **Real backend** (`api/` at the project root, `db.json`, `json-server`) —
-   a genuine serverless API (Vercel functions + Vercel KV) that was clearly
-   the *original* plan. **The frontend no longer calls any of it.** It's fully
-   wired, deployable, and dead — a "filing cabinet" that's still standing in
-   the warehouse but nobody has the key to it anymore. This is the single
-   biggest architectural fact to understand about this codebase: it evolved
-   from "real backend" → "local-only mock," and the old backend was never
-   deleted (Section 7 covers why that matters).
+   clicks. Unchanged in role across every revision.
+2. **Supabase** (`src/supabaseClient.js`, real calls from `src/api/api.js` and
+   `src/context/AuthContext.jsx`) — a real, hosted backend: Postgres tables
+   (`jobs`, `settings`) for data, and Supabase Auth for accounts (hashed
+   passwords, real sessions, email/password sign-up and sign-in). This is now
+   the **only** thing job data or authentication actually goes through. It
+   replaced two things at once: the `localStorage` mock (Revision 2) *and*
+   the original abandoned Vercel backend (item 3 below) — the project skipped
+   past "resurrect the old custom backend" and went straight to a managed
+   BaaS instead.
+3. **The original serverless backend** (`api/` at the project root, `db.json`,
+   `json-server`) — still exactly as dormant as Revision 2 described, just
+   for a different reason now: it isn't merely unused pending a decision, it
+   has been decisively bypassed by a different real backend entirely. This is
+   now the strongest case yet for actually deleting it (Section 9) rather
+   than leaving it as a "maybe someday" artifact — someday already happened,
+   and it went a different direction.
+4. **The mock layer** (`src/api/mockAuth.js`, `src/api/mockJobs.js`) — what
+   *was* the live data path in Revision 2, now fully orphaned. Nothing in
+   `src/` imports either file anymore (confirmed by grep). Same "evolved past
+   it, never deleted it" pattern flagged in every prior revision, now
+   claiming a third victim.
 
-The app is also now gated behind a **login wall**: `App.jsx` renders either
-the signup/login screen or the real app, depending on whether `AuthContext`
-currently holds a `user`. Every job is stored under a per-user key
-(`user_jobs_<uid>`) in `localStorage`, so two different accounts on the same
-browser don't see each other's data — a real multi-tenancy instinct, even
-though the "backend" is just the browser's own storage.
+The app is still gated behind a **login wall**, but the mechanism changed:
+`App.jsx` now holds its own `authMode` state (`"login"` | `"signup"`) and
+renders `LoginPage`/`SignupPage` as two real, separate components — the
+Revision 2 pattern of `SignupPage` handling both flows via an internal
+`isSignup` toggle is gone, and `LoginPage.jsx` (flagged in Revision 2 as dead
+code) is now genuinely wired in and used. Every job row is scoped by a real
+`user_id` column filtered server-side by Supabase, replacing the
+`user_jobs_<uid>` `localStorage`-key convention — same multi-tenancy intent
+as before, now backed by an actual database rather than browser storage that
+evaporates if the user clears site data or switches browsers.
+
+---
+
+## 0.1 What Changed Since Revision 2 (the Supabase Migration)
+
+This is a summary for anyone who read Revision 2 and just needs the delta,
+before the file-by-file sections below re-describe the affected files in
+full.
+
+**Files with real, functional changes (all currently uncommitted):**
+- `src/supabaseClient.js` — **new file**, untracked in git. Creates the one
+  shared Supabase client via `createClient(url, anonKey)`, reading both from
+  Vite env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+- `src/context/AuthContext.jsx` — rewritten to call `supabase.auth.signUp`,
+  `signInWithPassword`, `signOut`, `getSession`, and subscribe to
+  `onAuthStateChange`, instead of calling `MockAuthAPI`.
+- `src/api/api.js` — rewritten so `JobAPI` (`list`/`create`/`update`/`remove`)
+  issues real `supabase.from("jobs")` queries instead of delegating to
+  `MockJobsAPI`. `ThemeAPI` was *also* rewritten to hit a real `settings`
+  table — but, as in every previous revision, **nothing calls `ThemeAPI`** —
+  theme still persists via `localStorage` directly in `App.jsx`. It went
+  from "dead code that would 404 if called" to "dead code that would actually
+  work if called" — a smaller problem than before, but still unused.
+- `src/App.jsx` — the auth gate now owns `authMode` state directly and
+  renders `LoginPage`/`SignupPage` as siblings, rather than `SignupPage`
+  owning an internal toggle. `user.uid` became `user.id` everywhere (Supabase
+  session users use `.id`, not the `.uid` field name `MockAuthAPI` used).
+- `src/pages/LoginPage.jsx` / `SignupPage.jsx` — each now does exactly one
+  job (login-only / signup-only) and takes an `onSwitchToLogin`/
+  `onSwitchToSignup` prop to hand control back to `App.jsx`. **Revision 2's
+  roadmap item 5 ("delete or wire up `LoginPage.jsx`") is done** — it's wired
+  up, not deleted.
+- `src/components/Header.jsx` — import reorder only (`useContext` folded
+  into the main `react` import); no behavioral change. Note `logout` is now
+  `async` under the hood (real `supabase.auth.signOut()`) but `Header.jsx`
+  still calls it fire-and-forget with no `await`/error handling — see
+  Section 7.
+- `package.json` — `@supabase/supabase-js` added as a real, used dependency.
+  `firebase` and `@vercel/kv` remain installed and still completely unused —
+  worth noting that the "unused `firebase` dependency, probably an abandoned
+  auth migration" theory from Revision 2 turned out to be directionally
+  right (a real-auth migration *was* coming) but landed on a different
+  provider than the one already sitting in `package.json`.
+- `.env` — **new, untracked, and not covered by `.gitignore`** (which
+  currently only lists `node_modules/`). This is a real risk, not a
+  hypothetical one: the next `git add .`/`git add -A` in this repo would
+  stage real Supabase credentials for commit. See Section 7 and 9 — this is
+  the single highest-priority item in this revision.
+
+**Files unchanged by this migration, still exactly as Revision 2 left them:**
+`src/api/mockAuth.js`, `src/api/mockJobs.js` (now fully orphaned rather than
+partially), the entire `api/` root backend, `db.json`, `KanbanBoard.jsx`,
+`Dashboard.jsx`, `Analytics.jsx`, `stats.js`, `JobForm.jsx`,
+`StatusTimeline.jsx`, all `.css` files.
+
+**Net effect on the Revision 2 "Weaknesses" list:** the single biggest item
+— plaintext passwords with no hashing/salting/rate-limiting — is now
+**resolved**, since Supabase Auth owns password storage and hashing entirely.
+That was the headline security gap in Revision 2 and it no longer applies.
 
 ---
 
@@ -139,55 +221,61 @@ tree — wrapping it in `main.jsx` is the only place that guarantees that.
 
 ---
 
-### 2.2 `src/App.jsx` — Auth Gate + Root "Brain" Component
+### 2.2 `src/App.jsx` — Auth Gate + Root "Brain" Component (gate rewritten)
 
-**Purpose:** This file now does two jobs stacked on top of each other:
+**Purpose:** Still two jobs stacked on top of each other, but the gate itself
+got smarter:
 
-1. **`App` (the default export)** — a thin **auth gate**. It reads `user`
-   from `AuthContext`. If there's no logged-in user, it renders `SignupPage`
-   and stops — nothing else in the app ever mounts. If there is a user, it
-   renders `MainApp`.
-2. **`MainApp` (an internal, unexported component)** — everything the
-   previous revision of this document described as "`App.jsx`": the central
-   nervous system owning `jobs`, `activePage`, selection state, edit state,
-   filters, and theme. Every page (Dashboard, Applications, Analytics,
-   Settings) is a child that receives data and callbacks from `MainApp`.
+1. **`App` (the default export)** — the auth gate, now owning its own
+   `authMode` state (`"login"` | `"signup"`, defaulting to `"login"`) so it
+   can render `LoginPage` or `SignupPage` as two real, separate components
+   and hand each a callback to switch to the other. Revision 2's version only
+   ever rendered `SignupPage` (which internally handled both flows); that
+   internal toggle is gone (Section 2.4/2.5).
+2. **`MainApp`** — unchanged role: the central nervous system owning `jobs`,
+   `activePage`, selection state, edit state, filters, and theme.
 
 ```jsx
 export default function App() {
   const { user } = useContext(AuthContext);
-  if (!user) return <SignupPage />;
+  const [authMode, setAuthMode] = useState("login");
+
+  if (!user) {
+    return authMode === "login"
+      ? <LoginPage onSwitchToSignup={() => setAuthMode("signup")} />
+      : <SignupPage onSwitchToLogin={() => setAuthMode("login")} />;
+  }
   return <MainApp />;
 }
 ```
 
-**Why split into two components instead of an `if` inside one function:**
-`MainApp` calls hooks (`useState`, `useEffect`) unconditionally at its top
-level. If the gating logic and the job-tracking logic lived in one function,
-an early `return <SignupPage />` before those hooks ran would violate the
-Rules of Hooks the moment `user` changed from `null` to a real value (hooks
-must run in the same order on every render). Splitting into two components
-sidesteps that entirely — `MainApp` only ever mounts (and only ever calls its
-hooks) once a user exists.
+**Why this is a better design than Revision 2's internal-toggle approach:**
+the decision of "which screen" now lives in exactly one place (`App`), and
+both `LoginPage`/`SignupPage` are simple, single-purpose components that
+don't need to know about each other's existence beyond the one callback prop
+each receives. This is a small, real step toward "screens as routes" without
+yet introducing an actual router (Section 7/9).
 
-**Imports explained (delta from previous revision):**
+**Why the Rules-of-Hooks split into `App`/`MainApp` still holds:** unchanged
+from Revision 2 — `MainApp` still calls hooks unconditionally at its top
+level, so the early-return-before-`MainApp`-mounts pattern still requires two
+components, not one with an `if`.
+
+**Imports explained (delta from Revision 2):**
 
 | Import | Why needed | If removed |
 |---|---|---|
-| `useContext` (added to the React import) | Reads `AuthContext` in both `App` and `MainApp` | `user` would be undefined; app would crash trying to destructure it |
-| `AuthContext` from `./context/AuthContext.jsx` | The source of truth for who's logged in | No way to gate the app — everyone would see `MainApp` immediately, and `user.uid` would be undefined everywhere it's used for data scoping |
-| `SignupPage` from `./pages/SignupPage.jsx` | The screen shown when logged out | Logged-out users would see a blank app instead of a way to sign up |
-| `JobAPI` from `./api/api.js` (moved from `./api.js`) | Same role as before — create/read/update/delete jobs | `MainApp` couldn't load or persist any data |
+| `LoginPage` from `./pages/LoginPage.jsx` | Now actually rendered (Section 2.5) — previously imported nowhere | Logged-out users in "login" mode would see nothing |
+| `SignupPage` from `./pages/SignupPage.jsx` | Rendered in "signup" mode | Logged-out users couldn't switch to sign up |
+| `JobAPI` from `./api/api.js` | Now backed by real Supabase queries (Section 2.6), not `MockJobsAPI` | `MainApp` couldn't load or persist any data |
 
-Note the old `SearchIcon` unused import from `@mui/icons-material/Search` is
-**gone** — it's no longer present in the current file, so that particular
-piece of dead code has been cleaned up since the last revision.
-
-**State Analysis — what's new:** All the state described in the previous
-revision (`jobs`, `loading`, `error`, `activePage`, `selectedJobId`,
-`isEditing`, `editingJob`, `query`, `statusFilter`, `sortBy`, `view`, `mode`)
-is unchanged in shape. What's new is that **every data operation is now
-scoped by `user.uid`**:
+**Field name change worth flagging explicitly:** every `user.uid` reference
+from Revision 2 is now `user.id` — Supabase's session `user` object uses
+`.id`, not the `.uid` field name `MockAuthAPI`'s hand-rolled user objects
+used. This is a silent, easy-to-miss breaking change if any code elsewhere
+still assumed `.uid` — worth grepping for `\.uid\b` across `src/` to confirm
+nothing was missed (a quick check during this revision found none, but it's
+the kind of rename that's easy to leave half-done).
 
 ```js
 const { user } = useContext(AuthContext); // inside MainApp too
@@ -196,70 +284,90 @@ useEffect(() => {
   if (!user) return; // guards against a stale render before logout finishes
   (async () => {
     setLoading(true);
-    const data = await JobAPI.list(user.uid);
+    const data = await JobAPI.list(user.id);
     setJobs(data);
     ...
   })();
 }, [user]);
 
 const handleCreateJob = async (job) => {
-  const created = await JobAPI.create(user.uid, job);
+  const created = await JobAPI.create(user.id, job);
   ...
 };
 ```
 
-- **Why `[user]` is now a dependency of the load effect:** If a different
-  account logs in without a full page reload, this effect needs to re-run and
-  fetch *that* user's jobs instead of continuing to show the previous user's
-  in-memory `jobs` state.
-- **Why the guard `if (!user) return;`:** Because `MainApp` only ever renders
-  when `user` is truthy (enforced by the `App` gate above), this guard is
-  technically redundant in normal operation — but it's a defensive line
-  against the brief render that happens *during* `logout()` before `App`
-  swaps back to `SignupPage`, preventing a call to `JobAPI.list(undefined)`.
+- **Why `[user]` is still a dependency of the load effect:** unchanged
+  reasoning from Revision 2 — a different account logging in without a full
+  page reload needs this effect to re-run.
+- **Why the guard `if (!user) return;` matters more now than it used to:**
+  in the `MockJobsAPI` era, calling `JobAPI.list(undefined)` would just read
+  a `localStorage` key that happened not to exist and return `[]` — harmless.
+  Now it would fire a real Supabase query with `user_id = undefined`, which
+  is a real (if brief) wasted network round trip and a query shape a
+  security-conscious reviewer would want to double check can't return or
+  affect the wrong rows.
 
-**`handleUpdateJob`/`handleDeleteJob`:** Unchanged in shape from the previous
-revision, except every `JobAPI` call now takes `user.uid` as its first
-argument, so a user can never accidentally read or mutate another account's
-localStorage-namespaced job list.
+**`handleUpdateJob`/`handleDeleteJob`:** Same shape as before; every `JobAPI`
+call now takes `user.id`, and multi-tenancy is enforced by Supabase's
+`.eq("user_id", ...)` filters rather than a `localStorage` key namespace
+(Section 2.6).
 
 **Everything else** (the `filtered` derived list, `toggleTheme`, the
 `muiTheme` memo, the JSX composition of `Sidebar`/`Header`/pages, the
-Table/Board toggle) is materially unchanged from the previous revision — see
-Section 4 for the updated ownership diagram.
+Table/Board toggle) is materially unchanged — see Section 4 for the updated
+ownership diagram.
 
 **Still true (not fixed):** `query`, `statusFilter`, and `sortBy` exist and
 feed the `filtered` computation, but there is still no visible search box or
-filter dropdown wired to them anywhere in `MainApp`'s JSX. This was flagged
-before and remains an open issue (Section 7).
+filter dropdown wired to them anywhere in `MainApp`'s JSX. Flagged in every
+revision so far; still an open issue (Section 7).
 
 ---
 
-### 2.3 `src/context/AuthContext.jsx` — Global Auth State (NEW)
+### 2.3 `src/context/AuthContext.jsx` — Global Auth State (rewritten for Supabase)
 
-**Purpose:** The React Context that makes "who is logged in" available to any
-component in the tree without manually passing it down through props —
-`App.jsx` needs it for gating, `Header.jsx` needs it to wire up the Logout
-button, and neither is a direct parent/child of the other.
+**Purpose:** Unchanged role — the React Context that makes "who is logged in"
+available to any component without prop-drilling. What changed is *what's
+behind it*: this now wraps real Supabase Auth instead of `MockAuthAPI`.
 
-**Shape:**
+**Current shape:**
 ```js
-export const AuthContext = createContext();
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const currentUser = MockAuthAPI.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => setUser(session?.user ?? null)
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  const signup = async (email, password) => { ... };
-  const login  = async (email, password) => { ... };
-  const logout = () => { MockAuthAPI.logout(); setUser(null); };
+  const signup = async (email, password) => {
+    setError("");
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) { setError(error.message); throw error; }
+    return data.user;
+  };
+
+  const login = async (email, password) => {
+    setError("");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setError(error.message); throw error; }
+    return data.user;
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   return (
     <AuthContext.Provider value={{ user, loading, error, signup, login, logout }}>
@@ -269,143 +377,202 @@ export function AuthProvider({ children }) {
 }
 ```
 
-**The mount-time effect:** Runs once, checks `localStorage` (via
-`MockAuthAPI.getCurrentUser()`) for an already-logged-in session, and
-restores it into state. This is what makes a page refresh **not** log the
-user out — without it, `user` would always start `null` and every refresh
-would dump you back to the signup screen even with valid session data sitting
-in storage.
+**What genuinely improved over `MockAuthAPI`:**
+- **Real session persistence**, not a hand-rolled `current_user` localStorage
+  key: `getSession()` reads Supabase's own session storage (a signed JWT), and
+  `onAuthStateChange` keeps `user` in sync with token refreshes, expiry, and
+  sign-outs that might originate from another tab — none of which
+  `MockAuthAPI` could ever do, since it only ever read state once, on mount.
+- **Password hashing, salting, and storage are now Supabase's problem, not
+  this app's.** The Revision 2 "plaintext password" weakness is fully
+  retired — there is no code path left anywhere in this repo that stores or
+  compares a raw password.
+- **Real error messages from a real provider** (`error.message` from
+  Supabase) replace `MockAuthAPI`'s two hardcoded strings (`"User already
+  exists"` / `"Invalid email or password"`) — more informative, but also less
+  predictable for UI copy, since Supabase's wording isn't under this app's
+  control.
 
-**Why `signup`/`login` wrap their calls in `try/catch` and re-throw:** They
-update `error` state (for anyone who wants to read it from context) *and*
-re-throw, so the calling component (`SignupPage`) can also catch the error
-locally and show it inline next to the form — both the global `error` and a
-local one end up set, which is slightly redundant (see Section 7) but
-harmless.
+**`logout` is now `async` — and every caller still treats it as fire-and-forget.**
+`Header.jsx`'s `handleLogout` still just calls `logout()` with no `await` and
+no `.catch`. In the `MockAuthAPI` version this was harmless (`logout()` was
+synchronous and could not fail). Now it's a real network call to Supabase
+that *can* fail (e.g., offline) — if it does, the promise rejection is
+currently unhandled, and the UI would look like a logout succeeded (button
+click, nothing visibly wrong) when the session might not actually be revoked
+server-side. Worth fixing (Section 9).
 
-**Note:** `loading` and `error` are exposed on the context but **`loading` is
-never read anywhere else in the app** — `App.jsx`'s gate checks `user`
-directly, not `loading`, so there's a theoretical flash-of-signup-page on
-first load before the mount effect finishes (in practice it resolves
-synchronously from `localStorage`, so this is invisible, but it's not
-actually guarded against).
+**Note, unchanged from Revision 2:** `loading` and `error` are still exposed
+on the context but **`loading` is still never read anywhere else in the
+app** — same theoretical flash-of-login-page on first load, still not
+guarded against, now marginally more likely to be visible in practice since
+`getSession()` is a real (if usually fast) network/storage round trip rather
+than a synchronous `localStorage` read.
 
 **If this file were removed:** `App.jsx`, `Header.jsx`, `SignupPage.jsx`, and
 `LoginPage.jsx` would all fail to import `AuthContext` and crash at build
-time.
+time — unchanged from Revision 2.
 
 ---
 
-### 2.4 `src/pages/SignupPage.jsx` — The Actual Logged-Out Screen
+### 2.4 `src/pages/SignupPage.jsx` — Signup-Only Screen (narrowed)
 
-**Purpose:** The only auth screen actually wired into the app. Despite the
-name, it handles **both** signup and login behind a single `isSignup`
-boolean toggle — clicking "Sign Up" / "Login" at the bottom of the form flips
-which mode it's in and which `AuthContext` function (`signup` vs `login`) the
-form submits to.
+**Purpose:** No longer dual-purpose. The `isSignup` boolean toggle from
+Revision 2 is gone; this component now **only signs up**, and hands control
+back to `App.jsx` via a required `onSwitchToLogin` prop instead of flipping
+internal state.
 
-**Why one component for both, rather than routing to `LoginPage.jsx`:**
-There's no router in this app (Section 7), so "navigating" to a login screen
-would mean more `activePage`-style string-state plumbing. Toggling a boolean
-inside one component sidesteps that entirely — cheap and effective, though it
-does mean `LoginPage.jsx` sitting right next to it is now orphaned (Section
-2.5).
+**Why the split happened:** `App.jsx` (Section 2.2) now owns `authMode`
+itself, so there's no longer a reason for `SignupPage` to also carry
+navigation state — the "which screen" decision moved up to the one place
+that actually decides which screen renders. This also finally gives
+`LoginPage.jsx` a reason to exist as more than dead code (Section 2.5).
 
-**Local state:** `email`, `password`, `error` (a local copy, redundant with
-`AuthContext`'s `error` — see 2.3), `isSignup`.
+**Local state:** `email`, `password`, `error` (still a local copy, still
+redundant with `AuthContext`'s `error` — that duplication from Revision 1/2
+is unchanged).
 
-**`handleSubmit`:**
+**`handleSubmit`:** Now unconditionally `await signup(email, password)` — no
+branching. On success, `AuthContext.signup` already called `setUser(...)`
+internally, flipping `App.jsx`'s gate to `MainApp`, same mechanism as before.
+
+**Regression to flag:** the demo-credentials hint (`test@example.com` /
+`password123`) that Revision 2 displayed under the login-mode view is **gone
+along with the login branch** — appropriately, since those are `MockAuthAPI`
+seed-account credentials that no longer correspond to any real account in
+Supabase. No stale hint was left behind, which is good, but also nothing
+replaced it — a first-time visitor now has zero indication whether a demo
+account exists in this Supabase project.
+
+**UX/code-quality note, unchanged from Revision 2:** Still entirely
+inline-styled `style={{...}}`, unlike every other `.css`-file-styled
+page/component in the app (Section 7).
+
+---
+
+### 2.5 `src/pages/LoginPage.jsx` — Now Live (previously orphaned)
+
+**Purpose:** Login-only form, structurally the mirror of `SignupPage.jsx`.
+**Revision 2 flagged this file as dead code and recommended deleting it or
+wiring it up. It is now wired up** — `App.jsx` renders it directly when
+`authMode === "login"`, and it takes an `onSwitchToSignup` prop symmetrical
+to `SignupPage`'s `onSwitchToLogin`.
+
+**What changed to make this happen:** `App.jsx` gained `authMode` state and
+now imports and conditionally renders both `LoginPage` and `SignupPage` as
+siblings (Section 2.2), instead of only ever rendering `SignupPage`. The
+component itself needed only one small change to support this — accepting
+`onSwitchToSignup` as a prop and rendering a "Sign Up" link that calls it,
+mirroring the link `SignupPage` already had.
+
+**Still true:** Still no real router (Section 7/9) — "navigating" between
+these two screens is still boolean state in a parent, just one level higher
+up than before (`App.jsx` instead of `SignupPage.jsx`). That's a smaller,
+more honest version of the same pattern, not a router; the Revision 2/
+Section 9 recommendation to eventually add React Router still stands.
+
+**Demo credentials hint still present here:** unlike `SignupPage.jsx`, this
+file's JSX still displays `test@example.com` / `password123` — worth
+checking whether that account actually exists in the Supabase project now
+that `MockAuthAPI`'s auto-seeding no longer runs; if nobody manually created
+it in Supabase, this hint is now actively misleading rather than merely
+stale.
+
+---
+
+### 2.6 `src/api/api.js` — Real Network Layer Again (rewritten for Supabase)
+
+**Purpose:** Revision 2 described this file as a `MockJobsAPI` delegate. It's
+been rewritten a second time, and this time it's not a mock:
+
 ```js
-if (isSignup) {
-  await signup(email, password);
-} else {
-  await login(email, password);
-}
-```
-On success, nothing further happens here — `AuthContext.signup`/`login`
-already called `setUser(...)` internally, which flips `App.jsx`'s gate and
-unmounts `SignupPage` in favor of `MainApp` automatically. `SignupPage`
-itself never needs to know that happened; it just stops being rendered.
-
-**Demo credentials hint:** The form displays `test@example.com` /
-`password123` under the Login mode — this matches the seed account
-`MockAuthAPI` creates automatically on first use (see 2.7).
-
-**UX/code-quality note:** All styling here is inline `style={{...}}` objects,
-unlike every other page/component in the app, which uses `.css` files. This
-is a genuine inconsistency (see Section 7) — likely because this screen was
-built quickly as a functional stopgap rather than polished to match the rest
-of the app's design system.
-
----
-
-### 2.5 `src/pages/LoginPage.jsx` — Orphaned Component (NEW file, unused)
-
-**Purpose (as written):** A login-only form — same fields, same
-`AuthContext.login` call — structurally almost identical to `SignupPage.jsx`
-with `isSignup` hardcoded away.
-
-**Why it's dead code:** Nothing in the app imports it. `App.jsx` only ever
-renders `SignupPage` for logged-out users, and `SignupPage` already contains
-a full login flow internally. `LoginPage.jsx` was very likely an earlier
-attempt at splitting signup/login into two screens that was abandoned in
-favor of the toggle-based single screen, and never deleted.
-
-**Risk of leaving it in place:** None functionally (it's never imported, so
-it can't run), but it's a maintenance trap — a future developer might edit
-`LoginPage.jsx` expecting their change to take effect, and be confused when
-nothing changes in the running app. Should be deleted or explicitly wired up
-via a real router (Section 9).
-
----
-
-### 2.6 `src/api/api.js` — The (Now Partially Fake) Network Layer
-
-**Purpose:** Previously (see the earlier revision of this document) this was
-a thin `fetch()` wrapper hitting a real backend. It has been rewritten:
-
-```js
-import { MockJobsAPI } from "./mockJobs";
+import { supabase } from "../supabaseClient";
 
 export const JobAPI = {
-  async list(userId)            { return MockJobsAPI.getJobs(userId); },
-  async create(userId, job)     { return MockJobsAPI.createJob(userId, job); },
-  async update(userId, id, p)   { return MockJobsAPI.updateJob(userId, id, p); },
-  async remove(userId, id)      { return MockJobsAPI.deleteJob(userId, id); },
+  async list(userId) {
+    const { data, error } = await supabase.from("jobs").select("*")
+      .eq("user_id", userId).order("created_at", { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+  async create(userId, job) {
+    const { data, error } = await supabase.from("jobs")
+      .insert([{ ...job, user_id: userId }]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async update(userId, id, partial) {
+    const { data, error } = await supabase.from("jobs").update(partial)
+      .eq("id", id).eq("user_id", userId).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async remove(userId, id) {
+    const { error } = await supabase.from("jobs").delete()
+      .eq("id", id).eq("user_id", userId);
+    if (error) throw error;
+    return true;
+  },
 };
 
 export const ThemeAPI = {
-  async get()      { /* still does a real fetch to /api/settings/1 */ },
-  async set(mode)  { /* still does a real fetch to /api/settings/1 */ },
+  async get(userId) { /* real supabase.from("settings") query, keyed by user_id */ },
+  async set(userId, mode) { /* real supabase.from("settings").upsert(...) */ },
 };
 ```
 
-**What actually changed:** `JobAPI` no longer performs any `fetch()` call at
-all — every method is `async` only for interface-compatibility with callers
-that `await` it; internally it's a synchronous `localStorage` read/write via
-`MockJobsAPI`. The **shape** callers depend on (`list`, `create`, `update`,
-`remove`, all taking a `userId` first) is preserved, which is exactly why
-`App.jsx` didn't need to change its calling convention beyond adding
-`user.uid` as an argument — a real, if accidental, demonstration of why the
-adapter/facade pattern is valuable: the data source was swapped out entirely
-and the rest of the app didn't notice.
+**What actually changed:** Every `JobAPI` method now issues a real network
+request to Supabase's Postgres REST layer, and every method **filters by
+`user_id` on both read and write** (`.eq("user_id", userId)`) — the
+multi-tenancy guarantee that used to come from a `localStorage` key
+namespace (`user_jobs_<uid>`) is now enforced by explicit query filters
+instead. **The `JobAPI` facade's public shape didn't change at all** across
+this rewrite (`list`/`create`/`update`/`remove`, all still taking `userId`
+first) — the same adapter-pattern payoff Revision 2 called out (backend
+swapped, callers unchanged) held for a *second* consecutive backend swap,
+which is a stronger demonstration of the same lesson than getting it right
+once.
 
-**`ThemeAPI` is still present, still does real `fetch()` calls to
-`/api/settings/1`, and is still never imported or called anywhere in the
-app** (theme persists via `localStorage` directly in `App.jsx`, same as
-before). This is now doubly dead: not only is it unused, but even if
-something did call it, it would be hitting an `api/settings/[id].js`
-endpoint that nothing serves in the current deployment model.
+**Important nuance this rewrite introduces that `MockJobsAPI` never had:**
+client-side `.eq("user_id", userId)` filtering is a convenience, not a
+security boundary, unless Supabase **Row Level Security (RLS)** policies on
+the `jobs` (and `settings`) tables independently enforce
+`auth.uid() = user_id` server-side. That configuration lives in the
+Supabase dashboard/SQL, not in this repo, so it can't be verified by reading
+source — but it's worth explicitly confirming, because a JS query filter
+that a user could bypass by hand-crafting their own request against the same
+anon key would defeat the entire multi-tenancy model. This is the single
+most important thing to double-check about this migration (Section 7/9).
 
-**If `api.js` were removed:** `MainApp` couldn't talk to job storage at all;
-its data-load effect would throw `JobAPI is not defined`.
+**`ThemeAPI` was rewritten too, and is now real-but-still-unused.** It
+previously did a real `fetch()` to a dead `/api/settings/1` endpoint
+(Revision 2's "doubly dead" callout); now it does a real, *working*
+`supabase.from("settings")` query. Nothing imports or calls it — same as
+every revision before this one. Theme still persists via `localStorage`
+directly in `App.jsx`. It went from "would 404 if called" to "would actually
+work if called," which is progress, but it's still dead code today.
+
+**If `api.js` were removed:** Same as before — `MainApp` couldn't talk to job
+storage at all; its data-load effect would throw.
 
 ---
 
-### 2.7 `src/api/mockAuth.js` — `MockAuthAPI` (NEW)
+### 2.7 `src/api/mockAuth.js` — `MockAuthAPI` (now fully orphaned, up from "live")
 
-**Purpose:** A fake authentication backend, entirely `localStorage`-based,
-exposing `signup`, `login`, `getCurrentUser`, and `logout`.
+> **Status change this revision:** this was the *live* auth backend as of
+> Revision 2. As of the Supabase migration, **nothing in `src/` imports this
+> file anymore** — `AuthContext.jsx` calls `supabase.auth.*` directly
+> (Section 2.3). The description below is preserved as historical record of
+> what this module does; treat it as dead code, not as a description of how
+> auth currently works. Recommended action: delete it (Section 9) — keeping
+> a fully-featured fake auth backend around next to the real one is a
+> concrete liability, not a neutral one: a future developer could import it
+> by mistake, or a reader of the code could reasonably mistake it for a
+> fallback/offline mode that doesn't actually exist.
+
+**Purpose (historical, no longer live):** A fake authentication backend,
+entirely `localStorage`-based, exposing `signup`, `login`, `getCurrentUser`,
+and `logout`.
 
 **Storage keys:**
 - `mock_users` — a JSON array of *every* account ever signed up, each record
@@ -456,9 +623,15 @@ important to be able to say *why* this would never ship as-is.
 
 ---
 
-### 2.8 `src/api/mockJobs.js` — `MockJobsAPI` (NEW)
+### 2.8 `src/api/mockJobs.js` — `MockJobsAPI` (now fully orphaned, up from "live")
 
-**Purpose:** A fake per-user job store, entirely `localStorage`-based.
+> **Status change this revision:** this was the *live* data backend as of
+> Revision 2. `src/api/api.js`'s `JobAPI` now delegates to real Supabase
+> queries instead (Section 2.6) — nothing imports this file anymore. Kept
+> below as historical record; same recommendation as 2.7 (delete it).
+
+**Purpose (historical, no longer live):** A fake per-user job store, entirely
+`localStorage`-based.
 
 **Storage key pattern:** `user_jobs_<userId>` — e.g.
 `user_jobs_3f2a1c9e-...`. This is the concrete mechanism behind the
@@ -787,33 +960,45 @@ they simply never got wired into this system (Section 7).
 
 ---
 
-### 2.23 Backend: `api/_lib/store.js`, `api/jobs/*.js`, `api/settings/[id].js` — Now Fully Legacy
+### 2.23 Backend: `api/_lib/store.js`, `api/jobs/*.js`, `api/settings/[id].js` — Legacy, and Now Bypassed Rather Than Pending
 
-**What these files do** is unchanged from the previous revision's detailed
+**What these files do** is unchanged from earlier revisions' detailed
 walkthrough: a KV-or-in-memory storage abstraction (`store.js`), REST
 handlers for job CRUD with server-side `statusHistory` management
 (`api/jobs/index.js`, `api/jobs/[id].js`), and a settings/theme endpoint
 (`api/settings/[id].js`).
 
-**What changed is their status, not their code:** In the previous revision,
-only `ThemeAPI`/`api/settings` were flagged as unused; `api/jobs/*` was
-still the live, actually-called backend (via `src/api.js`'s `fetch()`
-calls). **That is no longer true.** Since `src/api/api.js`'s `JobAPI` now
-delegates entirely to `MockJobsAPI` (`localStorage`), **none** of the
-`api/jobs/*` serverless functions are called by the running app anymore
-either. The entire `api/` folder, `db.json`, and the `json-server`
-dev-dependency are now fully vestigial from the frontend's point of view —
-they'd only matter if someone deployed them and pointed a *different* client
-at them directly.
+**What changed this revision is the meaning of their dormancy, not their
+code or their called/not-called status** (they were already fully
+uncalled as of Revision 2). Revision 2's Section 9 roadmap posed this as an
+open decision: either delete this backend, or resurrect it as the real
+persistence layer. **That decision has effectively been made — just not in
+either direction Revision 2 anticipated.** Rather than reconnecting
+`src/api/api.js` to these Vercel functions, the project adopted Supabase (a
+hosted BaaS) instead (Section 2.6). This custom backend was not chosen, not
+extended, and not deleted — it now has the weakest possible justification
+for existing of any point in this project's history: it isn't even the
+leading candidate for "the real backend" anymore if one were needed, since a
+real backend already exists elsewhere.
 
-**If a future developer wants to move off `localStorage`-only storage:**
-this code is a legitimate, mostly-complete starting point — it already
-correctly implements the append-only `statusHistory` business rule
-server-side (something `MockJobsAPI` currently does *not* do, per Section
-2.8), has a working KV/in-memory storage abstraction, and correct REST
-semantics (404s, 405s, 201/204 status codes). Reconnecting `src/api/api.js`
-to call these endpoints instead of `MockJobsAPI` would be a much smaller
-lift than writing a real backend from scratch — see Section 9.
+**Why Supabase over resurrecting this code was a reasonable call, worth being
+able to explain in an interview:** Supabase gives real Postgres, real hosted
+auth (hashing, sessions, email flows), and Row Level Security out of the
+box, without hand-rolling and hosting a KV-backed REST API and a separate
+auth system. The custom `api/` backend's one genuine advantage —
+already-correct server-side `statusHistory` enforcement (Section 2.8/2.11)
+— did **not** carry over: that business rule is still built entirely
+client-side (`JobForm.jsx`, `KanbanBoard.jsx`) and handed to Supabase as
+plain columns/JSON on insert/update, with nothing server-side (e.g., a
+Postgres trigger or function) re-verifying it. That's a real, if narrow,
+regression opportunity worth knowing about even though it isn't new to this
+revision — it was already true under `MockJobsAPI`, and remains true under
+Supabase.
+
+**Recommendation, sharper than Revision 2's:** delete `api/`, `db.json`, and
+the `json-server` devDependency outright (Section 9). There is no longer a
+plausible future where this codebase reconnects to them — that fork in the
+road already resolved in Supabase's favor.
 
 ---
 
@@ -839,50 +1024,59 @@ lift than writing a real backend from scratch — see Section 9.
 
 ## 3. Data Flow Traces (User Action → Re-render)
 
-### 3.0 Sign Up (NEW)
+### 3.0 Sign Up (rewritten for Supabase)
 
 ```
-User lands on the app, not logged in → App.jsx: user is null → renders <SignupPage/>
-User fills email/password, isSignup=true (toggled via the bottom link) → clicks "Sign Up"
- → SignupPage.handleSubmit → AuthContext.signup(email, password)
-    → MockAuthAPI.signup(email, password)
-       → initializeMockUsers() seeds the demo account if this is the very first run
-       → rejects if email already exists in `mock_users`
-       → builds { uid: crypto.randomUUID(), email, password, createdAt }, appends to `mock_users`
-       → writes `current_user` = { uid, email } (password stripped)
-    → AuthContext: setUser({ uid, email })
- → App.jsx re-renders: user is now truthy → SignupPage unmounts, <MainApp/> mounts
- → MainApp's load effect fires ([user] dependency) → JobAPI.list(user.uid)
-    → MockJobsAPI.getJobs(user.uid) → localStorage key `user_jobs_<uid>` doesn't exist yet → []
+User lands on the app, not logged in → App.jsx: user is null, authMode="login" → renders <LoginPage/>
+User clicks "Sign Up" link → App.jsx: setAuthMode("signup") → <SignupPage/> renders instead
+User fills email/password → clicks "Sign Up" → SignupPage.handleSubmit → AuthContext.signup(...)
+    → supabase.auth.signUp({ email, password })
+       → Supabase hashes/stores the password server-side, creates a real auth.users row,
+         may send a confirmation email depending on the Supabase project's email-confirmation setting
+       → on error: setError(error.message); throw  (SignupPage shows it inline)
+       → on success: returns data.user
+    → onAuthStateChange fires (Supabase's own event, not this app's code) → AuthContext: setUser(session.user)
+ → App.jsx re-renders: user is now truthy → LoginPage/SignupPage unmount, <MainApp/> mounts
+ → MainApp's load effect fires ([user] dependency) → JobAPI.list(user.id)
+    → real supabase.from("jobs").select("*").eq("user_id", user.id) → likely [] for a brand-new account
  → user lands on an empty Dashboard, ready to add their first job
 ```
+**Nuance not present in the Revision 2 mock flow:** if the Supabase project
+has email confirmation enabled (the default on a new Supabase project), a
+freshly signed-up user's session may not be immediately active — `data.user`
+can come back non-null while `onAuthStateChange`/`getSession` still report
+no active session until the confirmation link is clicked. Worth manually
+verifying which behavior this specific project is configured for, since it
+directly affects whether "sign up" instantly logs someone in (as the mock
+always did) or requires an extra step now.
 
-### 3.0b Log In (NEW)
-
-```
-User on SignupPage with isSignup=false → fills email/password → clicks "Login"
- → AuthContext.login(email, password) → MockAuthAPI.login(...)
-    → looks up a user in `mock_users` matching BOTH email and password exactly
-    → throws "Invalid email or password" if no match (shown inline via SignupPage's local `error` state)
-    → on match: writes `current_user`, returns { uid, email }
- → AuthContext: setUser(...) → App.jsx swaps SignupPage for MainApp, same as signup above
-    → MainApp fetches THIS user's jobs from `user_jobs_<uid>` — a returning user sees their own data back
-```
-
-### 3.0c Log Out (NEW)
+### 3.0b Log In (rewritten for Supabase)
 
 ```
-User clicks "Logout" (Header.jsx, no confirmation dialog)
- → AuthContext.logout() → MockAuthAPI.logout() removes `current_user` from localStorage
-    (does NOT touch `mock_users` or that user's `user_jobs_<uid>` data — nothing is deleted)
- → AuthContext: setUser(null)
- → App.jsx re-renders: user is null → MainApp unmounts entirely (all its in-memory state is discarded),
-   SignupPage mounts in its place
- → Next login (same or different account) re-fetches from localStorage fresh — no data was lost,
-   only the in-memory React state of the now-unmounted MainApp
+User on <LoginPage/> (authMode="login", the default) → fills email/password → clicks "Login"
+ → AuthContext.login(email, password) → supabase.auth.signInWithPassword({ email, password })
+    → real error message from Supabase if credentials are wrong (not a fixed app string anymore)
+    → on success: writes a real session (JWT), returns data.user
+ → onAuthStateChange fires → AuthContext: setUser(session.user)
+ → App.jsx re-renders: LoginPage unmounts, <MainApp/> mounts, same as signup above
+    → MainApp fetches THIS user's jobs via supabase.from("jobs").eq("user_id", user.id)
 ```
 
-### 3.1 Create Job
+### 3.0c Log Out (rewritten for Supabase — now genuinely async)
+
+```
+User clicks "Logout" (Header.jsx, no confirmation dialog — unchanged gap from Revision 2)
+ → Header calls logout() WITHOUT awaiting it or catching a rejection
+ → AuthContext.logout() → await supabase.auth.signOut()  (a real network call — can fail, e.g. offline)
+    → on success: revokes the session server-side, then setUser(null)
+    → on failure: the promise rejects; nothing in Header.jsx observes this — the UI proceeds
+      as if logout succeeded regardless (Section 7 — worth fixing)
+ → App.jsx re-renders (once setUser(null) actually runs): user is null →
+   MainApp unmounts entirely, LoginPage mounts (authMode resets to its default, "login")
+ → Next login re-fetches fresh from Supabase — no data was lost, only in-memory React state
+```
+
+### 3.1 Create Job (real network call, still no error handling)
 
 ```
 User clicks "Add Job" (Header) → Header: setOpen(true) → JobForm opens (jobToEdit = null → "create mode")
@@ -890,39 +1084,50 @@ User clicks "Add Job" (Header) → Header: setOpen(true) → JobForm opens (jobT
  → User clicks "Save" → JobForm.handleSubmit
     → validateAndNormalizeUrl(form.link)
     → if valid: builds `job` object with a new crypto.randomUUID(), including an initial statusHistory entry
-    → calls onCreate(job)  [prop chain: JobForm → Header → MainApp.handleCreateJob]
-       → MainApp.handleCreateJob: await JobAPI.create(user.uid, job)
-          → MockJobsAPI.createJob(user.uid, job): assigns an id if missing, unshifts into
-            localStorage key `user_jobs_<uid>`, saves, returns the stored record
+    → calls onCreate(job)  [prop chain: JobForm → Header → MainApp.handleCreateJob — NO try/catch anywhere in this chain]
+       → MainApp.handleCreateJob: await JobAPI.create(user.id, job)
+          → real supabase.from("jobs").insert([{ ...job, user_id: user.id }]) — a genuine network round trip
        → setJobs(prev => [created, ...prev])
     → React re-renders MainApp and all children that read `jobs` (Dashboard/Analytics/Settings/JobList/KanbanBoard)
  → JobForm closes, form resets to blank defaults
 ```
-**Delta from the previous revision:** no network round-trip occurs at all now
-— every step above happens synchronously in the same browser tab. There is
-also no server-side reconciliation step anymore (Section 2.11) — whatever
-`JobForm` builds client-side is exactly what gets persisted, with no backend
-double-check.
+**Delta from Revision 2, and a real new risk:** Revision 2 correctly noted
+this used to be fully synchronous with nothing that could fail. **That is no
+longer true, and the error-handling code did not catch up.** `JobAPI.create`
+throws on any Supabase error (network drop, RLS policy rejecting the insert,
+a constraint violation) — and neither `MainApp.handleCreateJob`,
+`Header.jsx`, nor `JobForm.jsx`'s `handleSubmit` wraps this call in
+`try`/`catch` anywhere in the chain. Concretely: if this insert fails, the
+`await` throws, `setJobs` never runs, but there is nothing that catches the
+rejection either — the promise simply rejects unhandled. Depending on the
+browser this can silently do nothing visible, or log an uncaught error to
+the console that the user never sees; either way, `JobForm` may not close,
+there's no error message shown, and the user has no idea whether their job
+was saved. This is the most concrete, fixable gap this migration introduced
+(Section 7/9) — it's exactly the "server can now say no" case a purely
+client-side mock never had to handle.
 
-### 3.2 Edit Job
+### 3.2 Edit Job (same unhandled-error gap)
 
-Same sequence as the previous revision (row select → Edit button →
-`isEditing`/`editingJob` → modal opens pre-filled → status-change-date field
-appears conditionally → Save), except the final persistence step is now:
+Same sequence as before (row select → Edit button → `isEditing`/`editingJob`
+→ modal opens pre-filled → status-change-date field appears conditionally →
+Save), except the final persistence step now hits a real backend with the
+same missing error handling as 3.1:
 ```
 onUpdate(jobToEdit.id, partial) → MainApp.handleUpdateJob(id, partial)
-  → await JobAPI.update(user.uid, id, partial) → MockJobsAPI.updateJob(...): plain object merge, no
-    server-side statusHistory enforcement (Section 2.8) → saves to `user_jobs_<uid>`, returns the record
+  → await JobAPI.update(user.id, id, partial) → real supabase.from("jobs").update(partial)
+    .eq("id", id).eq("user_id", user.id) — no server-side statusHistory enforcement (Section 2.23)
   → setJobs(prev => prev.map(j => j.id === id ? updated : j))
   → onCancelEdit()
 ```
+Same caveat as 3.1: no `try`/`catch` around `handleUpdateJob`'s `await`.
 
 ### 3.3 Delete Job
 
-Same sequence as before, with `JobAPI.remove(user.uid, id)` →
-`MockJobsAPI.deleteJob(user.uid, id)` filtering the job out of that user's
-localStorage array and saving — no network call, no `204` response to wait
-on (the "await" resolves essentially instantly).
+Same shape, `JobAPI.remove(user.id, id)` → real
+`supabase.from("jobs").delete().eq("id", id).eq("user_id", user.id)` — a
+genuine network call that can fail, again with no `try`/`catch` anywhere in
+`handleDeleteJob`'s call chain.
 
 ### 3.4 Select Job
 
@@ -1098,232 +1303,346 @@ One concept is newly exercised by this revision:
 
 ---
 
-## 7. Engineering Assessment
+## 7. Engineering Assessment (Revision 3 — reassessed post-Supabase-migration)
 
 **Strengths**
-- Clear, consistent state-ownership model preserved through the auth
-  refactor — `MainApp` still correctly owns cross-cutting state; the new
-  `App`/`MainApp` split is a textbook-correct response to a real Rules-of-
-  Hooks constraint, not an accident.
-- The `JobAPI` facade (Section 2.6) proved its value in practice: the entire
-  storage backend was swapped from real HTTP calls to `localStorage` without
-  a single change needed in any component that calls `JobAPI` — this is
-  exactly the payoff the adapter pattern promises, actually realized here,
-  not just theoretical.
-- Real, working multi-user data isolation (`user_jobs_<uid>`), implemented
-  without being asked to scale to "real" multi-tenancy — a sign of thinking
-  about data ownership correctly even in a mock.
-- The `kanbanBoard.jsx`/`KanbanBoard.jsx` casing bug flagged in the previous
-  review has actually been fixed — concrete evidence that previous feedback
-  (or independent code review) gets acted on.
-- The analytics expansion (`stats.js`) adds genuinely useful, non-trivial
-  derived metrics (interview conversion, best month, per-role response rate)
-  without touching the two consumers (`Dashboard.jsx`, `Settings.jsx`) that
-  didn't need the new fields — an example of extending a shared function
-  additively rather than breaking its existing contract.
+- **The single biggest weakness in every prior revision — no real backend —
+  is now resolved.** Real Postgres, real hosted auth with password hashing,
+  real sessions. This is the one change with the most leverage on how this
+  project reads to an outside reviewer, more than any UI or feature work
+  could have delivered on its own.
+- **The `JobAPI` facade earned its keep for a second time.** Revision 2
+  already noted the adapter pattern paid off once (real HTTP → mock). It
+  just paid off again in the other direction (mock → real Supabase) with
+  zero changes required in any calling component. Two consecutive backend
+  swaps behind one stable interface is a genuinely strong, repeatable
+  demonstration of *why* this abstraction exists — worth stating plainly in
+  an interview, since it's rare for a portfolio project to actually
+  exercise a design pattern's payoff twice.
+- **`LoginPage.jsx`, flagged as dead code in Revision 2, is now live** — the
+  fix took the form of a real design decision (`App.jsx` owning `authMode`)
+  rather than the two options Revision 2 assumed ("delete it" or "add a
+  router"). This is evidence of solving the *actual* problem (two screens
+  need to coexist and hand off control) rather than mechanically satisfying
+  a checklist item.
+- **Multi-tenancy moved from a convention to an enforced query filter** —
+  `user_jobs_<uid>` (a `localStorage` key nobody could violate only because
+  nothing else read that browser's storage) became `.eq("user_id", userId)`
+  server-side filtering, which is the correct direction to move in even
+  though (see Weaknesses) it still needs RLS to be a real guarantee rather
+  than a client-side courtesy.
+- **State-ownership model held up across a third architectural change in a
+  row** (real backend → mock → real backend again) without `MainApp` needing
+  to be restructured each time — the separation between "who owns UI state"
+  and "how is data persisted" that was set up early is still paying off.
 
 **Weaknesses**
-- **Mock auth stores plaintext passwords in `localStorage`.** Explicitly
-  self-flagged in a code comment (`// In real app, this would be hashed!`),
-  so this is a known, deliberate shortcut rather than an oversight — but it's
-  worth being able to explain clearly why it's disqualifying for any real
-  deployment (no hashing/salting, no rate limiting, `localStorage` readable
-  by any script on the page).
-- **`LoginPage.jsx` is dead code.** It's a fully-built, never-imported
-  component; `SignupPage.jsx` independently implements the same login flow
-  internally via a toggle. Should be deleted, or the app should be refactored
-  to actually route to it.
-- **The entire top-level `api/` backend, plus `db.json` and the
-  `json-server` devDependency, are now fully dormant** — not partially, as
-  in the previous revision (which still had a live `api/jobs/*`). Nothing in
-  `src/` calls any of it anymore. This is a bigger version of the same
-  "evolved past it, never deleted it" pattern flagged before — now covering
-  an entire backend, not just one endpoint.
-- **An unused `firebase` dependency sits in `package.json`.** Never imported
-  anywhere. Strongly suggestive of an abandoned real-auth migration attempt,
-  another instance of the same pattern.
-- **Analytics.jsx's monthly chart lost its chronological sort** in the
-  rewrite that added the new KPI cards (Section 2.15) — bars can now render
-  out of calendar order. This reads as an accidental regression, not a
-  deliberate change.
-- **A real, user-visible metric bug:** Analytics' "Response Rate" and "Offer
-  Rate" KPI cards currently show the *same number* under two different
-  labels (Section 2.15), while the app's own `getResponseRate`/
-  `responseByRole` logic elsewhere clearly treats "response rate" as a
-  different, broader calculation (`responded / total`, where responded
-  includes Rejected). This should be fixed — either card should be corrected
-  or renamed.
-- **Search/Filter UI is still wired in state but not in the visible JSX** —
-  unchanged from the previous revision; still worth finishing or removing.
-- **No server-side validation exists anywhere anymore** (there's no server),
-  and there's also no client-side "sanity" layer beyond `JobForm`'s HTML
-  `required` attributes — since `MockJobsAPI` does a bare object merge with
-  no shape-checking, any code path that calls `JobAPI.create`/`update`
-  directly (bypassing `JobForm`) could write malformed records with nothing
-  to stop it.
-- **Logout has no confirmation**, unlike Delete — an accidental click
-  instantly discards the current in-memory UI state (open modals, unsaved
-  filter selections) with no warning, even though no actual data is lost.
-- **Styling inconsistency widened, not narrowed:** the new auth pages
-  (`SignupPage.jsx`, `LoginPage.jsx`) and the new Logout button
-  (`Header.jsx`) are all inline-styled, adding to the pre-existing
-  inconsistency around `KanbanBoard.jsx`'s inline styles versus every other
-  component's `.css` file convention.
-- **Carried over, still true:** duplicated `COLORS`/`KPI` definitions across
-  `Dashboard.jsx`/`Analytics.jsx`/`KanbanBoard.jsx`; `.jsx` extension on the
-  non-JSX `validation.jsx`; CSV export's unescaped-quote bug; blocking
-  native `alert()` in `exportCsv.js`.
+- **New, concrete, and the top priority: `.env` is untracked but not
+  gitignored.** `.gitignore` currently only lists `node_modules/`. The
+  Supabase URL and anon key currently sit in a file one `git add .`/`git add
+  -A` away from being committed and pushed to a public GitHub repo. The anon
+  key is designed to be public-safe *only if RLS is correctly configured*
+  (next point) — until that's confirmed, treat this as a real credential
+  exposure risk, not a style nit. Fix: add `.env` to `.gitignore` before the
+  next commit, and rotate the keys if `.env` was ever already committed in
+  an earlier commit (check `git log --all --full-history -- .env`).
+- **Row Level Security on the `jobs`/`settings` tables cannot be verified
+  from this repo** — it's a Supabase-dashboard/SQL concern, not client code.
+  `src/api/api.js`'s `.eq("user_id", userId)` filters are a correct and
+  necessary *client-side* convenience, but they are not a security boundary
+  by themselves: anyone with the anon key (which, per the point above, is
+  currently one accidental commit away from being public) could otherwise
+  query `jobs` with a different `user_id` unless RLS policies independently
+  enforce `auth.uid() = user_id` on every table. This is the single most
+  important thing to manually confirm in the Supabase dashboard before
+  calling this migration "done" from a security standpoint.
+- **New, concrete, and directly caused by this migration: zero error
+  handling on any Supabase write.** `handleCreateJob`, `handleUpdateJob`, and
+  `handleDeleteJob` in `App.jsx`, and every step of the prop chain from
+  `JobForm.jsx`/`Header.jsx` down to them, have no `try`/`catch` anywhere
+  (Section 3.1–3.3). Under `MockJobsAPI` this was never reachable — a
+  `localStorage` write basically cannot fail. Under Supabase it very much
+  can (RLS denial, network drop, constraint violation), and right now a
+  failure produces a silently unhandled promise rejection: no error message,
+  a modal that may not close, and no way for the user to know their data
+  wasn't saved. This is the most impactful, most fixable item in this
+  revision (Section 9).
+- **`AuthContext.logout` is `async` now but `Header.jsx` still calls it
+  fire-and-forget**, with no `await` and no `.catch` — same unhandled-
+  rejection shape as the point above, applied to sign-out instead of data
+  writes.
+- **Two now-fully-orphaned files, not partially, as before:**
+  `mockAuth.js`/`mockJobs.js` were the *live* path in Revision 2; now nothing
+  imports either. This is the same "evolved past it, never deleted it"
+  pattern the doc has flagged at every revision so far, now claiming its
+  third and fourth victims (on top of the still-dormant `api/` backend and
+  the still-unused `firebase` dependency, both carried over unresolved from
+  Revision 2 — see below).
+- **Carried over, unresolved from Revision 2 (nobody has acted on these
+  yet):** the entire `api/` backend + `db.json` + `json-server` remain
+  installed and dormant (Section 2.23, now with a sharper case for deletion
+  than before); the unused `firebase` dependency is still in `package.json`;
+  Search/Filter UI is still wired in state but never rendered; no
+  server-side *or* client-side shape validation beyond `JobForm`'s HTML
+  `required` attributes (now more consequential than before, since
+  malformed writes go to a real, persistent database instead of disposable
+  `localStorage`); Logout still has no confirmation dialog; the auth screens
+  are still inline-styled rather than using the app's CSS-variable theming;
+  Analytics' monthly chart still lacks a chronological sort; the "Response
+  Rate"/"Offer Rate" duplicate-metric bug (Section 2.15) is still present;
+  duplicated `COLORS`/`KPI` definitions across three components; `.jsx` on
+  the non-JSX `validation.jsx`; CSV export's unescaped-quote bug; blocking
+  native `alert()` in `exportCsv.js`. None of this list is new — it's
+  reproduced here so a reader of this revision alone doesn't lose track of
+  what's still open.
 
 **Scalability concerns**
 
-Largely unchanged from the previous revision, but now entirely a
-browser-storage concern rather than a server one: `MockJobsAPI.saveJobs`
-rewrites a user's *entire* job array to `localStorage` on every single
-mutation (write-amplification, same shape of problem the old in-memory
-backend had, just relocated), and `localStorage` itself has a hard per-origin
-size ceiling (typically ~5–10MB depending on browser) that a very active
-user could theoretically approach given enough jobs, notes, and status
-history over years of use — something a real backend would never risk.
+This is the one area where the migration is an unambiguous, complete win:
+every scalability caveat Revision 2 raised about `localStorage`
+(write-amplification on every mutation, a hard ~5–10MB per-origin size
+ceiling, data trapped in one browser profile) is resolved by moving to
+Postgres. The new scalability profile is whatever Supabase's own free/paid
+tier limits are — a normal, expected constraint for a real hosted database,
+not a self-inflicted architectural one.
 
 **Code quality / maintainability review**
 
-The core pattern from the previous revision holds: generally readable,
-sensibly named, mostly self-explanatory, with comments appearing exactly
-where the reasoning is genuinely non-obvious (`mockAuth.js`'s
-plaintext-password comment is a good example of this). The auth/analytics
-additions are consistent with the same "moving fast on feature work without
-a final consolidation pass" pattern already identified — evidenced concretely
-by two now-orphaned subsystems (`LoginPage.jsx`, the entire `api/` backend)
-and one unused dependency (`firebase`) accumulating in a single revision's
-worth of changes.
+The same "moves fast on feature work, doesn't always do a final
+consolidation pass" pattern the doc has now identified across three
+consecutive revisions repeated again here: two more orphaned files
+(`mockAuth.js`, `mockJobs.js`) joined the pile, and the error-handling gap
+around Supabase calls suggests the migration was verified against the
+happy path (login works, jobs load, jobs save) without a deliberate pass
+asking "what happens when Supabase says no?" That said, the actual
+migration code itself (`api.js`, `AuthContext.jsx`) is clean, readable, and
+correctly scoped — the gap is what *didn't* get touched (error boundaries,
+`.gitignore`, deleting the mocks) rather than quality problems in what did.
 
 **UI/UX review**
 
-The stale-application badge and the new role/time-based analytics insights
-continue to be genuinely thoughtful, real-world-useful features. The new
-weak spots are the unstyled auth screens (visually jarring compared to the
-polished MUI-based rest of the app) and the two Analytics KPI cards silently
-showing duplicate numbers under different names — a user comparing "Response
-Rate" against "Offer Rate" would reasonably expect two different numbers and
-might draw a wrong conclusion from seeing them match.
+Unchanged from Revision 2's read — the stale-application badge and
+role/time-based analytics remain the strongest UX ideas in the app.
+Nothing about the Supabase migration itself is user-visible when things go
+right; the new user-visible risk is entirely on the failure path (Weaknesses,
+above) — a network hiccup during a save now has no visible feedback at all,
+where previously (mock era) that failure mode literally could not occur.
 
 **Architecture review**
 
-Still sound for the app's size, and the auth addition was integrated cleanly
-via the correct tool (Context) without disturbing the existing state-
-ownership model. The most important architectural fact to carry forward is
-that **this app currently has zero server dependency at runtime** — it is a
-fully client-side, `localStorage`-backed SPA wearing the API-shaped
-interfaces of a real client/server app. That's a deliberate and reasonable
-choice for a personal, single-browser tool and for a portfolio demo, but it
-means "your data" is really "this browser profile's data" — clearing browser
-storage, or opening the app in a different browser/device, means starting
-over with no jobs and no accounts, since none of it lives anywhere but that
-one browser.
+The most important architectural fact changed for the first time since
+Revision 1: **this app now has a real server dependency at runtime again.**
+Revision 2's framing — "your data is really just this browser profile's
+data" — no longer applies; data now lives in Supabase, survives a cleared
+browser, and is reachable from any device the user logs into. That is a
+genuine upgrade in what this project can honestly claim to be. The
+remaining architectural question is no longer "should this get a real
+backend" (answered) but "is the real backend correctly locked down"
+(RLS, above) and "does the app degrade gracefully when that backend is
+unreachable" (error handling, above) — both now open, both now answerable
+with concrete, scoped fixes rather than a rewrite.
 
 ---
 
-## 8. Skill Assessment
+## 8. Skill Assessment (Revision 3)
 
 Based on this codebase, the developer continues to demonstrate skills
-consistent with **Strong Junior, trending toward Mid-Level**, with this
-revision adding evidence on both sides of that assessment.
+consistent with **Strong Junior, trending toward Mid-Level** — the same band
+as Revision 2 — but this migration is the strongest single piece of evidence
+yet in favor of the "trending" half of that label, specifically because it
+tackles the exact gap (no real backend) that most separates a portfolio
+project from something resembling production software.
 
 **New evidence supporting the "trending mid-level" read:**
-- Correctly reached for React Context specifically when prop drilling
-  stopped being the right tool (`user`/`logout` needed by components with no
-  direct parent/child relationship), rather than either over-using Context
-  everywhere or forcing everything through props regardless of fit.
-- Recognized and correctly solved a real Rules-of-Hooks constraint by
-  splitting `App`/`MainApp` — many developers at this level would instead
-  reach for a hacky early-return-before-hooks pattern that works until it
-  doesn't (e.g., the moment a second piece of state needs a hook above the
-  gate).
-- Kept the `JobAPI` facade's public shape stable while completely swapping
-  its implementation (real HTTP → `localStorage`) — demonstrates
-  understanding *why* that abstraction layer existed in the first place, not
-  just that it happened to be there.
-- Extended `getJobStats` additively (new return fields, no breaking changes
-  to existing consumers) rather than rewriting it in a way that would have
-  forced updates to `Dashboard.jsx` and `Settings.jsx` too.
-- Self-documented a known security shortcut in code (`mockAuth.js`'s
-  plaintext-password comment) rather than leaving it silently wrong — shows
-  awareness of the gap even without fixing it yet.
+- **Independently executed a real backend migration** — not "added a
+  feature," but swapped both the auth provider and the data layer to a
+  hosted service, correctly re-pointed every call site, and did it without
+  breaking the `JobAPI`/`AuthContext` interfaces the rest of the app depends
+  on. This is qualitatively different work from feature-level changes seen
+  in earlier revisions.
+- **Recognized that a facade/adapter should survive a second backend swap**
+  — `JobAPI`'s public shape held constant across real-HTTP → mock →
+  real-Supabase. That's not luck; it's the direct payoff of a design
+  decision made early and respected consistently.
+- **Solved the `LoginPage.jsx` dead-code problem with an actual design
+  decision** (`authMode` lifted to `App.jsx`) rather than just deleting the
+  file to make a lint warning go away — shows it was treated as a UX problem
+  to solve, not a checklist item to clear.
+- **Chose a managed backend (Supabase) over resurrecting a half-built custom
+  one** (Section 2.23) — recognizing that "the code already exists" isn't a
+  strong enough reason to extend it when a better-fit tool is available is a
+  genuinely mid-level judgment call, not a junior one.
 
 **Evidence still consistent with "not yet senior":**
-- The pattern of abandoning a subsystem mid-migration without deleting it
-  repeated at least twice in this revision alone (`LoginPage.jsx`, the
-  unused `firebase` dependency) on top of the pre-existing dormant `api/`
-  backend — a senior engineer in code review would likely have caught and
-  removed at least one of these before merging.
-- The Analytics "Response Rate"/"Offer Rate" duplicate-number bug (Section
-  7) suggests the new KPI cards were added without checking the resulting
-  UI against the existing cards for redundancy — a quick manual QA pass
-  comparing the two numbers side by side would have caught this immediately.
-- The lost chronological sort in the monthly chart is the kind of thing that
-  slips through when a rewrite focuses on adding a new feature and doesn't
-  re-verify behavior the previous version of the same function used to
-  guarantee.
+- **The exact failure mode a senior engineer is trained to ask about first —
+  "what happens when this network call fails?" — has no answer anywhere in
+  the create/update/delete/logout call chains** (Section 7). This is the
+  single clearest signal in this revision: the migration was validated
+  against the happy path, and the question of backend failure wasn't asked
+  before merging.
+- **A credential-hygiene gap that a senior reviewer would flag before
+  anything else in this diff:** `.env` sitting untracked-but-not-ignored
+  (Section 7) is a five-minute fix, but the fact that it wasn't caught
+  before this analysis suggests the habit of checking `git status` /
+  `.gitignore` coverage before introducing new secret-bearing files isn't
+  fully automatic yet.
+- **The same "migrate, don't clean up" pattern from every prior revision
+  repeated again** — `mockAuth.js`/`mockJobs.js` joined `LoginPage.jsx`
+  (now resolved) and the dormant `api/` backend and unused `firebase`
+  dependency (both still unresolved from Revision 2) as accumulated dead
+  weight. Four instances of the same pattern across three revisions is
+  enough to call it a habit rather than a one-off.
+- **Whether Row Level Security is actually configured cannot be verified
+  from the code** (Section 7) — and there's no evidence in this codebase
+  (no SQL migration files, no comment, no README mention) that it was
+  deliberately checked and confirmed, as opposed to assumed. A senior
+  engineer would treat "does the server independently enforce this" as a
+  mandatory checkbox before calling an auth migration complete, not an
+  optional afterthought.
 
 ---
 
-## 9. Improvement Roadmap
+## 9. Improvement Roadmap (Revision 3)
 
 **High Impact**
-1. **Fix the Analytics "Response Rate" / "Offer Rate" duplicate-metric bug**
-   (Section 7) — decide what each card is actually supposed to show
-   (`responded/total` vs `Offer/total`) and make sure they show different,
-   correctly-labeled numbers.
-2. **Restore chronological ordering to the "Applications by Month" chart** in
-   `Analytics.jsx` — reintroduce a sort key (e.g., the previous `_sort =
-   year*12 + month` trick) before rendering `monthlyData`.
-3. **Decide the fate of the dormant `api/` backend, `db.json`, and
-   `json-server`.** Either (a) delete them, since the app is now fully
-   `localStorage`-based and they add pure cognitive overhead with zero
-   runtime benefit, or (b) deliberately resurrect them as the real
-   persistence layer (pointing `src/api/api.js`'s `JobAPI` at real `fetch()`
-   calls again) if moving beyond single-browser storage is actually a goal —
-   the backend already correctly implements the `statusHistory` business
-   rule server-side, which would be a real win to get back (Section 2.8).
-4. **Replace mock auth with real auth** before this could ever be used by
-   more than one person on a trusted device — the already-installed but
-   unused `firebase` dependency suggests this was already being considered;
-   Firebase Auth (or any real hashed-password/OAuth provider) would remove
-   the plaintext-password problem entirely and pair naturally with
-   resurrecting the real backend from item 3.
-5. **Delete `src/pages/LoginPage.jsx`** (or actually wire it up via a router)
-   — it's dead code that will confuse the next person who edits it expecting
-   an effect.
+1. **Add `.env` to `.gitignore` immediately, before any further commits.**
+   This is a five-minute fix and the single highest-priority item in this
+   revision (Section 7). If `.env` was ever staged or committed previously,
+   check `git log --all --full-history -- .env` and rotate the Supabase
+   keys if so.
+2. **Add error handling to every Supabase write path** — `handleCreateJob`,
+   `handleUpdateJob`, `handleDeleteJob` in `App.jsx`, and `AuthContext`'s
+   `logout` (Section 7). At minimum, `try`/`catch` around each `await` and
+   an error state surfaced to the user (reusing the existing `error` state/
+   `state-msg error` styling already used for the initial load failure would
+   be the smallest correct fix — it already exists in `App.jsx`, it's just
+   not reused here).
+3. **Confirm Row Level Security is enabled and correct** on the `jobs` and
+   `settings` tables in the Supabase dashboard (`auth.uid() = user_id` on
+   select/insert/update/delete). This can't be checked from this repo, which
+   is exactly why it needs a deliberate, documented check rather than an
+   assumption.
+4. **Delete `src/api/mockAuth.js` and `src/api/mockJobs.js`.** Both are now
+   fully unreferenced dead code (Section 2.7/2.8) — same recommendation
+   Revision 2 made about `LoginPage.jsx`, which *was* acted on; these two
+   files are the next overdue instance of the same cleanup.
+5. **Decide the fate of the dormant `api/` backend, `db.json`, and
+   `json-server`** — Revision 2 posed this as an open choice; that choice
+   has now effectively been made in Supabase's favor (Section 2.23), which
+   makes "delete it" the clear answer rather than a coin flip. Nothing about
+   this migration benefits from keeping it around any longer.
+6. **Fix the Analytics "Response Rate" / "Offer Rate" duplicate-metric bug**
+   — unresolved, carried over from Revision 2 (Section 7).
+7. **Restore chronological ordering to the "Applications by Month" chart**
+   — unresolved, carried over from Revision 2.
 
 **Medium Impact**
-6. **Wire up (or remove) Search and Status Filter UI** — unchanged from the
-   previous revision's recommendation; still not done.
-7. **Deduplicate status colors/KPI components** into a shared
-   `constants/statusColors.js` and a shared `<KPI/>` — unchanged
-   recommendation, now spanning three independent copies (`Dashboard.jsx`,
-   `Analytics.jsx`, `KanbanBoard.jsx`).
-8. **Add a confirmation step to Logout**, matching the existing Delete
-   confirmation pattern, so an accidental click doesn't discard in-progress
-   UI state with no warning.
-9. **Testing** — still zero automated tests anywhere. `utils/stats.js` is
-   now a much stronger first candidate than before, given the new
-   `extractRoleType`/`getResponseRate`/`getBestMonth` logic has several edge
-   cases (empty jobs array, unparseable dates, tie-breaking in "best month")
-   that are exactly the kind of thing unit tests catch cheaply.
-10. **React Router** — same recommendation as before; would also let
-    `LoginPage.jsx` (item 5) become a real, separately-linkable route instead
-    of dead code or a toggle.
+8. **Add automated tests** — this recommendation gets meaningfully more
+   valuable post-migration, not less: Revision 2 framed this around
+   `utils/stats.js`'s pure-function edge cases, which still stands, but now
+   there's a second, arguably higher-value target — `src/api/api.js`'s
+   Supabase queries and `AuthContext`'s auth flows are exactly the kind of
+   real-network-boundary code that silently breaks without tests (a typo in
+   a `.eq()` filter, for instance, could leak or hide rows with no visible
+   symptom in normal manual testing). Vitest + React Testing Library, per
+   the original recruiter-style critique this revision responds to
+   (Section 10).
+9. **Client-side shape validation before every Supabase write** (zod/yup, as
+   the critique in Section 10 suggests) — more consequential now than under
+   `MockJobsAPI`, since a malformed write now persists in a real, shared
+   database rather than disposable `localStorage`.
+10. **Wire up (or remove) Search and Status Filter UI** — unchanged,
+    unresolved since Revision 1.
+11. **Deduplicate status colors/KPI components** — unchanged, unresolved.
+12. **Add a confirmation step to Logout** — unchanged, unresolved, and
+    marginally more important now that logout is a real network call that
+    can be slow or fail (Section 7).
+13. **React Router** — unchanged recommendation; would let the
+    `LoginPage`/`SignupPage` split (already improved this revision) become
+    real, linkable routes instead of `authMode` state in `App.jsx`.
 
 **Low Impact**
-11. **Style the auth pages consistently** with the rest of the app's CSS-
-    variable-based theming, instead of the current ad-hoc inline styles that
-    don't respond to dark/light mode the way the rest of the UI does.
-12. **TypeScript** — unchanged recommendation from the previous revision.
-13. **File attachments**, **Smart insights** — the "smart insights" item
-    from the previous revision's roadmap is now partially realized
-    (role-based response rate, best month, interview conversion); remaining
-    low-impact ideas in this space (e.g., "best day of week to apply") are
-    still gated on having enough real data volume to be meaningful.
-14. **Activity feed / Notifications** — unchanged recommendations from the
-    previous revision; both remain natural extensions of the existing
-    `statusHistory` data model.
+14. **Style the auth pages consistently** with the app's CSS-variable
+    theming — unchanged, unresolved.
+15. **TypeScript** — unchanged recommendation.
+16. **File attachments**, **richer analytics** (per-week application rate,
+    average response delay — both named in the Section 10 critique) —
+    natural next steps now that data lives somewhere durable enough to make
+    week-over-week trends meaningful.
+17. **Activity feed / Notifications** — unchanged, unresolved.
+18. **Feature-folder / hooks refactor** (`useJobs`, `useAuth`, `services/`)
+    — `App.jsx`'s `MainApp` is still one large component owning most of the
+    app's state; extracting data-fetching into custom hooks would be a
+    natural next step now that the data layer itself (Supabase) is settled
+    and less likely to change again soon.
+
+---
+
+## 10. Reconciling an External Critique Against Current Reality
+
+An external, recruiter-style review of this project was received and read
+alongside this migration. It's reproduced here point-by-point against what
+the code actually shows today, because several of its claims were accurate
+about an earlier state of this repo but are no longer accurate now, and it's
+worth being precise about which is which rather than treating the critique
+as either fully right or fully outdated.
+
+**Claims the critique made that were already false by the time it was
+written (i.e., features it suggested already existed):**
+- *"Add a Kanban board — Applied/Interview/Offer/Rejected as draggable
+  columns."* `KanbanBoard.jsx` already existed using `@hello-pangea/dnd`,
+  documented since Revision 1/2 of this file (Section 2.13). Toggle between
+  Table/Board view is a first-class part of the Applications page
+  (`App.jsx`'s `view` state).
+- *"Even fake auth — login, protected routes, session persistence — changes
+  perception."* Auth already existed as of Revision 2 (mocked), and as of
+  this revision is **real** Supabase Auth, which exceeds what the critique
+  asked for.
+
+**Claims that were true when written and are now resolved by this
+migration:**
+- *"No real backend credibility... looks like a frontend app pretending to
+  be fullstack."* This was the single most accurate criticism in the
+  document, and it's the one this migration directly targets: real API
+  persistence (Postgres via Supabase) and real auth are both in place now.
+  What the critique asked for under this heading that is **still missing**:
+  optimistic updates, and retry/graceful-failure handling — see the "not yet
+  resolved" list below, since these map directly onto the unhandled-
+  rejection gap in Section 7.
+
+**Claims that remain true and unaddressed:**
+- *"Missing testing = missing trust."* Still zero automated tests anywhere
+  in this repo. This is arguably **more** true post-migration than before:
+  a test suite around `JobAPI`/`AuthContext` would catch a Supabase query or
+  auth-flow regression that manual clicking-through easily misses (Section
+  9, item 8).
+- *"Your validation is too thin... add zod or yup."* Still only
+  `validateAndNormalizeUrl` plus HTML `required` attributes. More
+  consequential now than when the critique was written, since bad writes
+  now land in a real, persistent, shared database (Section 9, item 9).
+- *"Real analytics — applications/week, response rate, average response
+  delay, interview conversion rate."* Partially true as a gap: interview
+  conversion rate and a "best month" metric already existed before this
+  migration (Section 2.20); per-week application rate and average response
+  delay genuinely do not exist yet (Section 9, item 16).
+- *"Too much logic inside App.jsx... custom hooks, feature folders, service
+  layer."* Still accurate — if anything, `MainApp` picked up more
+  responsibility this revision (auth-aware data loading, `authMode` in the
+  parent `App`), not less (Section 9, item 18).
+- *"Mobile UX polish."* Not assessable from source alone — this requires
+  actually opening the running app on a small viewport, which this analysis
+  did not do. Flagging it as genuinely unverified rather than confirming or
+  denying it.
+
+**One thing worth saying plainly:** the critique's framing — "good learning
+project" vs. "someone we can trust inside production" — was a fair
+description of the state it was reviewing. The gap it centers on
+architecture: no real backend, no tests, thin validation is a coherent,
+correctly-prioritized list, and this migration closed the largest single
+item on it. The two next highest-leverage moves, in order, are the ones
+this revision's own analysis converged on independently: (1) error handling
+around the now-real network calls, because a backend that can fail and
+silently doesn't tell anyone is arguably a worse look in a live demo than no
+backend at all, and (2) an automated test suite, for exactly the reason the
+critique gave — it's the concrete, verifiable signal that separates "I got
+it working" from "I know it keeps working."

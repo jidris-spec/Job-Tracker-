@@ -1,38 +1,73 @@
-import { MockJobsAPI } from "./mockJobs";
+import { supabase } from "../supabaseClient";
 
 export const JobAPI = {
   async list(userId) {
-    return MockJobsAPI.getJobs(userId);
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
   },
 
   async create(userId, job) {
-    return MockJobsAPI.createJob(userId, job);
+    const { data, error } = await supabase
+      .from("jobs")
+      .insert([{ ...job, user_id: userId }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 
   async update(userId, id, partial) {
-    return MockJobsAPI.updateJob(userId, id, partial);
+    const { data, error } = await supabase
+      .from("jobs")
+      .update(partial)
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 
   async remove(userId, id) {
-    return MockJobsAPI.deleteJob(userId, id);
+    const { error } = await supabase
+      .from("jobs")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
   },
 };
 
 export const ThemeAPI = {
-  async get() {
-    const r = await fetch(`/api/settings/1`);
-    if (!r.ok) throw new Error(`Theme fetch failed (${r.status})`);
-    const data = await r.json();
-    return { mode: data.theme || "light" };
+  async get(userId) {
+    const { data, error } = await supabase
+      .from("settings")
+      .select("theme")
+      .eq("user_id", userId)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return { mode: data?.theme || "dark" };
   },
-  async set(mode) {
-    const r = await fetch(`/api/settings/1`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: mode }),
-    });
-    if (!r.ok) throw new Error(`Theme update failed (${r.status})`);
-    const data = await r.json();
+
+  async set(userId, mode) {
+    const { data, error } = await supabase
+      .from("settings")
+      .upsert({ user_id: userId, theme: mode })
+      .select()
+      .single();
+
+    if (error) throw error;
     return { mode: data.theme };
   },
 };
